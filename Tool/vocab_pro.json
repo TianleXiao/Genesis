@@ -1,0 +1,34 @@
+{
+    "words": {
+        "enthusiastic": {
+            "meaning": "热情的",
+            "level": 0,
+            "next_review": "2026-04-29"
+        },
+        "consequences": {
+            "meaning": "后果",
+            "level": 0,
+            "next_review": "2026-04-29"
+        }
+    },
+    "prepositions": {
+        "depend ___": {
+            "answer": "on",
+            "meaning": "取决于",
+            "level": 1,
+            "next_review": "2026-04-30"
+        },
+        "be capable ___": {
+            "answer": "of",
+            "meaning": "能够",
+            "level": 0,
+            "next_review": "2026-04-29"
+        },
+        "protest ___": {
+            "answer": "against",
+            "meaning": "抗议",
+            "level": 0,
+            "next_review": "2026-04-29"
+        }
+    }
+}
