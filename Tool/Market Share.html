@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketShare // Live Tracking</title>
+    <!-- Tailwind CSS for minimalist styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-50 min-h-screen flex flex-col antialiased selection:bg-zinc-50 selection:text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 bg-zinc-50 text-zinc-950 transition-colors duration-300">
+
+    <!-- Header -->
+    <header class="border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 flex justify-between items-center backdrop-blur-md sticky top-0 z-50 bg-white/80 dark:bg-zinc-950/80 transition-colors duration-300">
+        <div class="flex items-center space-x-3">
+            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            <h1 class="text-sm font-medium tracking-widest uppercase">MarketShare // LIVE</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <!-- Chart Type Selector -->
+            <div class="flex bg-zinc-200 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-800 text-xs transition-colors duration-300">
+                <button onclick="changeChartType('bar')" id="btn-bar" class="px-3 py-1.5 rounded-md font-medium transition-all bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm">Bar</button>
+                <button onclick="changeChartType('line')" id="btn-line" class="px-3 py-1.5 rounded-md font-medium transition-all text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200">Line</button>
+                <button onclick="changeChartType('doughnut')" id="btn-doughnut" class="px-3 py-1.5 rounded-md font-medium transition-all text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200">Doughnut</button>
+            </div>
+            
+            <!-- Dark/Light Mode Toggle -->
+            <button onclick="toggleTheme()" class="p-2 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
+                <svg id="theme-icon" class="w-4 h-4 text-zinc-600 dark:text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Visualization Card -->
+        <div class="lg:col-span-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 p-6 flex flex-col justify-between min-h-[400px] transition-colors duration-300">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Global Share</h2>
+                    <p class="text-xl font-light mt-1 text-zinc-900 dark:text-zinc-50">Smartphone Market Fluctuations</p>
+                </div>
+                <span class="text-[10px] bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-1 rounded font-mono uppercase tracking-wider transition-colors duration-300">Update Rate: 2s</span>
+            </div>
+            <div class="flex-1 relative w-full flex items-center justify-center">
+                <canvas id="marketChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Live Data Feed & Metrics -->
+        <div class="flex flex-col gap-6">
+            <!-- Summary Card -->
+            <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 p-6 transition-colors duration-300">
+                <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">Leading Brand (24h)</h2>
+                <div class="flex items-baseline space-x-2">
+                    <span id="top-brand" class="text-3xl font-light tracking-tight text-zinc-900 dark:text-zinc-50">—</span>
+                    <span id="top-share" class="text-sm font-mono text-zinc-500 dark:text-zinc-400">—</span>
+                </div>
+            </div>
+
+            <!-- Detailed List -->
+            <div class="border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50 p-6 flex-1 flex flex-col transition-colors duration-300">
+                <h2 class="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">Live Brand Data</h2>
+                <div id="brand-list" class="space-y-4 flex-1 justify-center flex flex-col">
+                    <!-- Dynamic Rows will be injected here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-zinc-200 dark:border-zinc-800 px-6 py-4 text-center text-[10px] text-zinc-500 font-mono tracking-widest uppercase transition-colors duration-300">
+        Designed with absolute minimalism // 2026
+    </footer>
+
+    <script>
+        // Core Data State
+        const brands = ['Apple', 'Samsung', 'Xiaomi', 'Vivo', 'Oppo', 'Others'];
+        
+        // Initial market shares (must sum up to 100)
+        let marketData = [21.5, 19.0, 14.2, 9.8, 8.5, 27.0]; 
+        
+        let chartInstance = null;
+        let currentChartType = 'bar';
+        let isDarkMode = true;
+
+        // Monochrome color palettes
+        const darkColors = {
+            bg: ['#FFFFFF', '#E4E4E7', '#A1A1AA', '#71717A', '#3F3F46', '#18181B'],
+            border: '#18181B',
+            grid: '#27272A',
+            text: '#F4F4F5'
+        };
+
+        const lightColors = {
+            bg: ['#09090B', '#27272A', '#52525B', '#8E8E93', '#D4D4D8', '#F4F4F5'],
+            border: '#F4F4F5',
+            grid: '#E4E4E7',
+            text: '#09090B'
+        };
+
+        // Chart Configuration Generator
+        function getChartConfig(type) {
+            const theme = isDarkMode ? darkColors : lightColors;
+            
+            const config = {
+                type: type,
+                data: {
+                    labels: brands,
+                    datasets: [{
+                        label: 'Market Share (%)',
+                        data: marketData,
+                        backgroundColor: theme.bg,
+                        borderColor: type === 'line' ? (isDarkMode ? '#FFFFFF' : '#09090B') : theme.border,
+                        borderWidth: type === 'line' ? 2 : 1,
+                        pointBackgroundColor: isDarkMode ? '#FFFFFF' : '#09090B',
+                        tension: 0.4 // Smooth curves for line chart
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: type === 'doughnut',
+                            position: 'bottom',
+                            labels: {
+                                color: theme.text,
+                                font: { family: 'Inter', size: 11 },
+                                boxWidth: 12
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                            titleColor: isDarkMode ? '#FFFFFF' : '#09090B',
+                            bodyColor: isDarkMode ? '#A1A1AA' : '#52525B',
+                            borderColor: isDarkMode ? '#27272A' : '#E4E4E7',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) { return ` ${context.raw.toFixed(2)}%`; }
+                            }
+                        }
+                    },
+                    scales: {}
+                }
+            };
+
+            // Apply grid lines only to Cartesian charts
+            if (type === 'bar' || type === 'line') {
+                config.options.scales = {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: theme.text, font: { family: 'Inter' } }
+                    },
+                    y: {
+                        grid: { color: theme.grid },
+                        ticks: { color: theme.text, font: { family: 'Inter' } },
+                        max: type === 'bar' ? 40 : undefined, // Constrain visual jump
+                        min: type === 'bar' ? 0 : undefined
+                    }
+                };
+            }
+
+            return config;
+        }
+
+        // UI & Data Updates
+        function initChart() {
+            const ctx = document.getElementById('marketChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, getChartConfig(currentChartType));
+        }
+
+        function changeChartType(type) {
+            currentChartType = type;
+            ['bar', 'line', 'doughnut'].forEach(t => {
+                const btn = document.getElementById(`btn-${t}`);
+                if (t === type) {
+                    btn.className = "px-3 py-1.5 rounded-md font-medium transition-all bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm";
+                } else {
+                    btn.className = "px-3 py-1.5 rounded-md font-medium transition-all text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200";
+                }
+            });
+            initChart();
+        }
+
+        function updateUIElements() {
+            const brandList = document.getElementById('brand-list');
+            brandList.innerHTML = '';
+
+            // Find top brand
+            let maxIndex = marketData.indexOf(Math.max(...marketData));
+            document.getElementById('top-brand').innerText = brands[maxIndex];
+            document.getElementById('top-share').innerText = `${marketData[maxIndex].toFixed(1)}% SHARE`;
+
+            // Render modern progress rows
+            brands.forEach((brand, idx) => {
+                const percentage = marketData[idx].toFixed(1);
+                const row = document.createElement('div');
+                row.className = "space-y-1";
+                row.innerHTML = `
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-zinc-500 dark:text-zinc-400">${brand}</span>
+                        <span class="font-medium text-zinc-900 dark:text-zinc-50">${percentage}%</span>
+                    </div>
+                    <div class="w-full bg-zinc-200 dark:bg-zinc-800/50 h-[2px] rounded-full overflow-hidden">
+                        <div class="bg-zinc-900 dark:bg-zinc-100 h-full transition-all duration-500" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                brandList.appendChild(row);
+            });
+        }
+
+        // Simulate Live Data Fluctuations
+        function simulateLiveTracking() {
+            setInterval(() => {
+                // Generate micro-fluctuations while keeping total sum constant near 100%
+                let totalDelta = 0;
+                const deltas = brands.map((_, i) => {
+                    if (i === brands.length - 1) return 0; // Fix last one to balance out
+                    const delta = (Math.random() - 0.5) * 0.8; // Small variance
+                    totalDelta += delta;
+                    return delta;
+                });
+                
+                // Adjust last element to absorb the delta sum
+                marketData = marketData.map((val, i) => {
+                    let newVal = val + (i === brands.length - 1 ? -totalDelta : deltas[i]);
+                    return Math.max(2, Math.min(45, newVal)); // Bound between 2% and 45%
+                });
+
+                // Soft normalization to guarantee precise 100%
+                const currentSum = marketData.reduce((a, b) => a + b, 0);
+                marketData = marketData.map(val => (val / currentSum) * 100);
+
+                // Dynamically update chart and UI layout
+                if (chartInstance) {
+                    chartInstance.data.datasets[0].data = marketData;
+                    chartInstance.update('none'); // Update without full layout flash
+                }
+                updateUIElements();
+            }, 2000); // 2-second real-time pulse
+        }
+
+        // Theme Engine (Light / Dark)
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                // Sun icon to Moon icon
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`;
+                isDarkMode = false;
+            } else {
+                html.classList.add('dark');
+                // Moon icon to Sun icon
+                icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z"></path>`;
+                isDarkMode = true;
+            }
+            
+            // Re-render chart elements with new theme styles
+            initChart();
+            updateUIElements(); // Refresh colors on the dynamic lists
+        }
+
+        // App Entry Point
+        window.onload = () => {
+            initChart();
+            updateUIElements();
+            simulateLiveTracking();
+        };
+    </script>
+</body>
+</html>
