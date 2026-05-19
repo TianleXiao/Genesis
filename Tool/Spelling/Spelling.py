@@ -145,7 +145,7 @@ def main():
         print("2. ➕ Add New Word")
         print("3. 🔗 Add Preposition Phrase")
         print("4. 📋 View Library List")
-        print("5. 🗑️  Delete an Item")
+        print("5. 🗑️Delete an Item")
         print("6. ❌ Exit")
         
         cmd = input("\nChoose an option (1-6): ").strip()
