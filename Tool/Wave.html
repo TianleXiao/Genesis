@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Track & Particle Physics</title>
+    <style>
+        /* Reset margins and hide overflow for fullscreen visualizer */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050505;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Panel Styling */
+        #ui-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(20, 20, 20, 0.6);
+            padding: 15px 25px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        button.active {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        #start-btn {
+            background: #ff4757;
+            border-color: #ff4757;
+        }
+        
+        #start-btn:hover {
+            background: #ff6b81;
+            box-shadow: 0 0 15px rgba(255, 71, 87, 0.6);
+        }
+
+        #status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.4);
+            font-size: 14px;
+            pointer-events: none;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">Waiting for audio input...</div>
+
+    <div id="ui-container">
+        <button id="start-btn">Start Audio Track</button>
+        <button class="mode-btn active" data-mode="water">Water</button>
+        <button class="mode-btn" data-mode="fire">Fire</button>
+        <button class="mode-btn" data-mode="particles">Particles</button>
+    </div>
+
+    <canvas id="visualizer"></canvas>
+
+    <script>
+        // DOM setup and Context initialization
+        const canvas = document.getElementById('visualizer');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize performance
+        const startBtn = document.getElementById('start-btn');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const statusText = document.getElementById('status');
+
+        // Global state
+        let width, height;
+        let particlesArray = [];
+        let currentMode = 'water'; 
+        let isAudioInitialized = false;
+
+        // Audio variables
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let source;
+
+        // Handle window resize dynamically
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Particle Physics Class
+        class Particle {
+            constructor(x, y, mode, audioVolume, barIndex = 0) {
+                this.x = x;
+                this.y = y;
+                this.mode = mode;
+                this.life = 1.0;
+                
+                // Volume power impacts particle initial explosion force
+                const power = audioVolume * 0.15 + 0.5;
+
+                if (this.mode === 'water') {
+                    // Water: Fast drop, high gravity, bounces off floor
+                    this.size = Math.random() * 3 + 2;
+                    this.vx = (Math.random() - 0.5) * 4;
+                    this.vy = -(Math.random() * 12 + 8) * power; 
+                    this.gravity = 0.7; // Heavy
+                    this.color = `hsla(${200 + Math.random() * 30}, 100%, 60%, `;
+                    this.decay = Math.random() * 0.015 + 0.005;
+                } 
+                else if (this.mode === 'fire') {
+                    // Fire: Rises up, shrinks, negative gravity
+                    this.size = Math.random() * 15 + 8;
+                    this.vx = (Math.random() - 0.5) * 3;
+                    this.vy = -(Math.random() * 6 + 2) * power;
+                    this.gravity = -0.12; // Floats upwards
+                    this.color = `hsla(${Math.random() * 40}, 100%, 55%, `;
+                    this.decay = Math.random() * 0.03 + 0.01;
+                } 
+                else if (this.mode === 'particles') {
+                    // Magic Particles: Rainbow colors, explodes outwards from the track
+                    this.size = Math.random() * 4 + 1;
+                    this.vx = (Math.random() - 0.5) * 15 * power;
+                    this.vy = (Math.random() - 0.5) * 15 * power - 2;
+                    this.gravity = 0.15; // Float slowly down
+                    // Color matches the specific audio frequency bar it spawned from
+                    this.color = `hsla(${barIndex * 2}, 100%, 65%, `;
+                    this.decay = Math.random() * 0.02 + 0.01;
+                }
+            }
+
+            update() {
+                // Apply Euler integration for physics
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+
+                // Ground collision specific to Water mode
+                if (this.mode === 'water' && this.y >= height - this.size) {
+                    this.y = height - this.size;
+                    this.vy *= -0.4; // Lose energy on bounce
+                    this.vx *= 0.8;  // Friction
+                }
+            }
+
+            draw() {
+                if (this.life <= 0) return;
+
+                ctx.beginPath();
+                if (this.mode === 'fire') {
+                    ctx.arc(this.x, this.y, Math.max(this.size * this.life, 0.1), 0, Math.PI * 2);
+                } else {
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                }
+                
+                ctx.fillStyle = this.color + this.life + ')';
+                ctx.fill();
+            }
+        }
+
+        // Initialize Microphone and Web Audio API
+        async function initAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 512; // Higher resolution for smooth track bars
+                
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                isAudioInitialized = true;
+                startBtn.style.display = 'none';
+                statusText.innerText = 'Audio Track Active. Play some music!';
+                
+            } catch (err) {
+                console.error('Mic access denied:', err);
+                statusText.innerText = 'Microphone permission required.';
+            }
+        }
+
+        // Draw the Audio Track (EQ) with distinct Light and Dark zones
+        function drawAudioTrack(bufferLength) {
+            // We only draw the lower 70% of frequencies as highs are often empty
+            const visualBins = Math.floor(bufferLength * 0.7); 
+            const barWidth = (width / visualBins);
+            let x = 0;
+
+            for (let i = 0; i < visualBins; i++) {
+                const amplitude = dataArray[i]; // Range 0 - 255
+                const intensity = amplitude / 255; // Normalized 0.0 - 1.0
+
+                // -------------------------------------------------------------
+                // Light and Dark distinction logic (明暗部核心逻辑)
+                // Low amplitude -> Dark, dim, transparent
+                // High amplitude -> Bright, opaque, glowing
+                // -------------------------------------------------------------
+                
+                let hue = 0;
+                if (currentMode === 'water') hue = 200 + (i * 0.2); // Blues
+                else if (currentMode === 'fire') hue = i * 0.3; // Reds/Oranges
+                else if (currentMode === 'particles') hue = i * 2; // Rainbow
+
+                // Calculate brightness: base 5% + up to 60% based on audio intensity
+                const lightness = 5 + (intensity * 60); 
+                // Alpha: completely quiet is barely visible (0.05), loud is solid (1.0)
+                const alpha = 0.05 + (intensity * 0.95);
+
+                ctx.fillStyle = `hsla(${hue}, 100%, ${lightness}%, ${alpha})`;
+
+                // Add bloom/glow effect ONLY for the bright parts (high intensity)
+                if (intensity > 0.6) {
+                    ctx.shadowBlur = 20 * intensity;
+                    ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                } else {
+                    ctx.shadowBlur = 0; // Dark parts have no glow
+                }
+
+                // Dynamic bar height based on amplitude
+                const barHeight = amplitude * (height / 500); 
+
+                // Draw the track originating from the bottom
+                ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+
+                // Add a bright "cap" at the top of the bar for peak visual impact
+                if (intensity > 0.3) {
+                    ctx.fillStyle = `hsla(${hue}, 100%, 90%, ${alpha})`;
+                    ctx.fillRect(x, height - barHeight - 2, barWidth - 1, 2);
+                }
+
+                // Spawn particles directly from the active bars randomly
+                if (intensity > 0.7 && Math.random() > 0.8) {
+                    const spawnY = currentMode === 'particles' ? height - barHeight : height - 10;
+                    particlesArray.push(new Particle(x + barWidth/2, spawnY, currentMode, amplitude, i));
+                }
+
+                x += barWidth;
+            }
+
+            // Reset shadow to avoid affecting particles or background
+            ctx.shadowBlur = 0; 
+        }
+
+        // Main Animation Loop
+        function animate() {
+            // Background fading for motion trails
+            ctx.globalCompositeOperation = 'source-over';
+            if (currentMode === 'fire') {
+                ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'lighter'; // Glowing blend mode
+            } else {
+                ctx.fillStyle = 'rgba(5, 5, 5, 0.25)';
+                ctx.fillRect(0, 0, width, height);
+            }
+
+            if (isAudioInitialized) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Draw the reactive audio spectrum track first
+                ctx.globalCompositeOperation = 'source-over';
+                drawAudioTrack(analyser.frequencyBinCount);
+            }
+
+            // Set composite operation for particles
+            if (currentMode === 'fire' || currentMode === 'particles') {
+                ctx.globalCompositeOperation = 'lighter';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            // Update and render particles
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+
+                // Garbage collect dead particles
+                if (particlesArray[i].life <= 0) {
+                    particlesArray.splice(i, 1);
+                    i--;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // UI Event Listeners
+        startBtn.addEventListener('click', () => {
+            if (!isAudioInitialized) initAudio();
+        });
+
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                modeBtns.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                currentMode = e.target.getAttribute('data-mode');
+                particlesArray = []; // Clear current physics objects
+                
+                // Fast clear background to prevent ghosting during switch
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, width, height);
+            });
+        });
+
+        // Initialize loop
+        animate();
+    </script>
+</body>
+</html>

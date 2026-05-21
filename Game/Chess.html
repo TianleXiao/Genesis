@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Chinese Chess - Traditional Masterpiece</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --surface: #141418;
+            --surface-sub: #1e1e24;
+            --border: #2c2c35;
+            --text-main: #f0f0f0;
+            --text-dim: #888899;
+            --red-piece: #ff4d4d;
+            --black-piece: #ffffff;
+            --board-line: #555566;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+            --cell-size: 64px; 
+            --board-pad: 10px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        
+        .container { display: flex; gap: 40px; max-width: 1200px; width: 100%; align-items: flex-start; }
+
+        .sidebar { flex: 1; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        h1 { font-size: 1.4rem; font-weight: 300; margin-bottom: 20px; letter-spacing: -0.02em; }
+        .label-tiny { font-size: 10px; font-weight: 600; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; display: block; }
+        
+        .panel-section { background: #0f0f12; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .peer-id-display { font-family: monospace; font-size: 1rem; color: #fff; font-weight: bold; background: var(--surface-sub); padding: 8px; border-radius: 4px; border: 1px solid var(--border); margin-top: 4px; word-break: break-all; }
+        
+        .input-group { display: flex; gap: 8px; margin-top: 4px; }
+        input[type="text"] { flex: 1; background: var(--surface-sub); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; color: #fff; font-size: 0.9rem; outline: none; }
+        input[type="text"]:focus { border-color: var(--text-dim); }
+
+        .btn { background: var(--text-main); color: var(--bg); border: none; padding: 8px 16px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn:hover { background: #e5e5e5; }
+        .btn-secondary { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-secondary:hover { color: #fff; border-color: #666; }
+
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-top: 8px; background: #222; color: var(--text-dim); margin-right: 4px;}
+        .status-badge.connected { background: #1b4332; color: #52b788; }
+        .status-badge.your-turn { background: #431b1b; color: #b75252; }
+        .status-badge.local-mode { background: #1a233a; color: #70a1ff; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 5px; text-align: center; }
+        .stat-card { background: var(--surface-sub); padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
+        .stat-val { font-size: 1.2rem; font-weight: bold; margin-top: 2px; }
+        .log-box { max-height: 120px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; margin-top: 10px; }
+
+        .board-wrapper {
+            position: relative;
+            background: #e4d8b8; 
+            padding: var(--board-pad);
+            border-radius: 4px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8), inset 0 0 40px rgba(0,0,0,0.2);
+            transition: transform 0.6s var(--ease);
+        }
+
+        .svg-layer { position: absolute; top: var(--board-pad); left: var(--board-pad); pointer-events: none; z-index: 1; }
+        .chess-board { position: relative; display: grid; grid-template-columns: repeat(9, var(--cell-size)); grid-template-rows: repeat(10, var(--cell-size)); z-index: 5; }
+        .cell { position: relative; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        .piece {
+            width: 50px; height: 50px; border-radius: 50%; background: #f4ecce; border: 2px solid #555;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.6rem; font-weight: bold; font-family: "Kaiti", "STKaiti", serif;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.4), inset -2px -4px 6px rgba(0,0,0,0.1);
+            user-select: none; transition: transform 0.2s var(--ease); pointer-events: none;
+        }
+        
+        .piece.red { color: #c42222; border-color: #a31111; }
+        .piece.black { color: #111111; border-color: #000000; }
+        
+        .cell.selected .piece { transform: scale(1.15) translateY(-2px); box-shadow: 0 8px 15px rgba(0,0,0,0.4); border-color: #444; }
+        .cell.last-move::before { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: rgba(0,0,0,0.2); z-index: 4; }
+        .cell.valid-target::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: rgba(82, 183, 136, 0.6); z-index: 4; left: calc(50% - 7px); top: calc(50% - 7px); }
+        .cell.blunder-target::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: rgba(255, 77, 77, 0.8); z-index: 4; left: calc(50% - 7px); top: calc(50% - 7px); }
+
+        .flipped-view { transform: rotate(180deg); }
+        .flipped-view .piece { transform: rotate(180deg); }
+        .flipped-view .svg-layer { transform: rotate(180deg); }
+        .flipped-view .cell.selected .piece { transform: scale(1.15) translateY(-2px) rotate(180deg); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="sidebar">
+            <h1>Chess Studio Pro</h1>
+            
+            <div class="panel-section">
+                <span class="label-tiny">Match Stats</span>
+                <div class="stats-grid">
+                    <div class="stat-card" style="border-color: #52b788;"><span class="label-tiny">WIN</span><div class="stat-val" id="statWins" style="color: #52b788;">0</div></div>
+                    <div class="stat-card" style="border-color: #ff4d4d;"><span class="label-tiny">LOSE</span><div class="stat-val" id="statLosses" style="color: #ff4d4d;">0</div></div>
+                    <div class="stat-card"><span class="label-tiny">RATE</span><div class="stat-val" id="statRate">0%</div></div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="label-tiny">Your Room Key</span>
+                <div class="peer-id-display" id="myIdDisplay">Generating...</div>
+                <button class="btn btn-secondary" style="margin-top: 8px; width: 100%;" onclick="copyRoomKey()">Copy Key</button>
+            </div>
+
+            <div class="panel-section">
+                <span class="label-tiny">Join Room</span>
+                <div class="input-group">
+                    <input type="text" id="peerIdInput" placeholder="Paste opponent key...">
+                    <button class="btn" onclick="connectToPeer()">Join</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="label-tiny">Game Status</span>
+                <div id="connectionStatus" class="status-badge local-mode">Local Mode</div>
+                <div id="turnStatus" class="status-badge">Turn: Red</div>
+                <div id="roleStatus" class="status-badge" style="display:none;"></div>
+                <div class="log-box" id="logBox">SVG Board rendering initialized. Traditional Chinese layout active.</div>
+            </div>
+            
+            <button class="btn btn-secondary" style="width: 100%;" onclick="initBoard()">Reset Match</button>
+        </div>
+
+        <div class="board-wrapper" id="boardWrapper">
+            <div class="chess-board" id="board"></div>
+        </div>
+    </div>
+
+    <script>
+        let boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+        let selectedCell = null;
+        let myRole = null; 
+        let currentTurn = 'red'; 
+        let peer = null;
+        let conn = null;
+        let lastMove = { from: null, to: null };
+
+        let matchStats = JSON.parse(localStorage.getItem('chess_p2p_stats')) || { wins: 0, losses: 0 };
+
+        const initialPieces = [
+            { r: 0, c: 0, type: '車', color: 'black' }, { r: 0, c: 1, type: '馬', color: 'black' },
+            { r: 0, c: 2, type: '象', color: 'black' }, { r: 0, c: 3, type: '士', color: 'black' },
+            { r: 0, c: 4, type: '將', color: 'black' }, { r: 0, c: 5, type: '士', color: 'black' },
+            { r: 0, c: 6, type: '象', color: 'black' }, { r: 0, c: 7, type: '馬', color: 'black' },
+            { r: 0, c: 8, type: '車', color: 'black' }, { r: 2, c: 1, type: '砲', color: 'black' },
+            { r: 2, c: 7, type: '砲', color: 'black' }, 
+            { r: 3, c: 0, type: '卒', color: 'black' }, { r: 3, c: 2, type: '卒', color: 'black' }, 
+            { r: 3, c: 4, type: '卒', color: 'black' }, { r: 3, c: 6, type: '卒', color: 'black' }, 
+            { r: 3, c: 8, type: '卒', color: 'black' },
+
+            { r: 9, c: 0, type: '車', color: 'red' }, { r: 9, c: 1, type: '馬', color: 'red' },
+            { r: 9, c: 2, type: '相', color: 'red' }, { r: 9, c: 3, type: '仕', color: 'red' },
+            { r: 9, c: 4, type: '帥', color: 'red' }, { r: 9, c: 5, type: '仕', color: 'red' },
+            { r: 9, c: 6, type: '相', color: 'red' }, { r: 9, c: 7, type: '馬', color: 'red' },
+            { r: 9, c: 8, type: '車', color: 'red' }, { r: 7, c: 1, type: '炮', color: 'red' },
+            { r: 7, c: 7, type: '炮', color: 'red' }, 
+            { r: 6, c: 0, type: '兵', color: 'red' }, { r: 6, c: 2, type: '兵', color: 'red' }, 
+            { r: 6, c: 4, type: '兵', color: 'red' }, { r: 6, c: 6, type: '兵', color: 'red' }, 
+            { r: 6, c: 8, type: '兵', color: 'red' }
+        ];
+
+        function renderSVGBoard() {
+            const CS = 64; const w = 9 * CS; const h = 10 * CS; const strokeColor = "#333"; const half = CS / 2;
+            let svgStr = `<svg class="svg-layer" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+            svgStr += `<rect x="${half}" y="${half}" width="${8 * CS}" height="${9 * CS}" fill="none" stroke="${strokeColor}" stroke-width="3"/>`;
+
+            for (let r = 1; r < 9; r++) { const y = r * CS + half; svgStr += `<line x1="${half}" y1="${y}" x2="${w - half}" y2="${y}" stroke="${strokeColor}" stroke-width="1"/>`; }
+            for (let c = 1; c < 8; c++) {
+                const x = c * CS + half;
+                svgStr += `<line x1="${x}" y1="${half}" x2="${x}" y2="${4 * CS + half}" stroke="${strokeColor}" stroke-width="1"/>`;
+                svgStr += `<line x1="${x}" y1="${5 * CS + half}" x2="${x}" y2="${9 * CS + half}" stroke="${strokeColor}" stroke-width="1"/>`;
+            }
+
+            const pLines = [
+                { x1: 3*CS+half, y1: 0*CS+half, x2: 5*CS+half, y2: 2*CS+half }, { x1: 5*CS+half, y1: 0*CS+half, x2: 3*CS+half, y2: 2*CS+half },
+                { x1: 3*CS+half, y1: 7*CS+half, x2: 5*CS+half, y2: 9*CS+half }, { x1: 5*CS+half, y1: 7*CS+half, x2: 3*CS+half, y2: 9*CS+half }
+            ];
+            pLines.forEach(l => { svgStr += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${strokeColor}" stroke-width="1"/>`; });
+
+            const drawFlower = (c, r, ignoreL, ignoreR) => {
+                const cx = c * CS + half; const cy = r * CS + half; const gap = 5; const len = 12; let m = "";
+                if (!ignoreL) { m += `<polyline points="${cx-gap-len},${cy-gap} ${cx-gap},${cy-gap} ${cx-gap},${cy-gap-len}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`; m += `<polyline points="${cx-gap-len},${cy+gap} ${cx-gap},${cy+gap} ${cx-gap},${cy+gap+len}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`; }
+                if (!ignoreR) { m += `<polyline points="${cx+gap+len},${cy-gap} ${cx+gap},${cy-gap} ${cx+gap},${cy-gap-len}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`; m += `<polyline points="${cx+gap+len},${cy+gap} ${cx+gap},${cy+gap} ${cx+gap},${cy+gap+len}" fill="none" stroke="${strokeColor}" stroke-width="2"/>`; }
+                return m;
+            };
+
+            const markSpots = [
+                {c:1, r:2}, {c:7, r:2}, {c:1, r:7}, {c:7, r:7}, 
+                {c:0, r:3}, {c:2, r:3}, {c:4, r:3}, {c:6, r:3}, {c:8, r:3}, 
+                {c:0, r:6}, {c:2, r:6}, {c:4, r:6}, {c:6, r:6}, {c:8, r:6} 
+            ];
+            markSpots.forEach(s => { svgStr += drawFlower(s.c, s.r, s.c === 0, s.c === 8); });
+
+            const textY = 4.5 * CS + half + 10; 
+            svgStr += `<text x="${2 * CS + half}" y="${textY}" font-family="Kaiti, STKaiti, serif" font-size="32" fill="${strokeColor}" font-weight="bold" text-anchor="middle" letter-spacing="30">楚河</text>`;
+            svgStr += `<text x="${6 * CS + half}" y="${textY}" font-family="Kaiti, STKaiti, serif" font-size="32" fill="${strokeColor}" font-weight="bold" text-anchor="middle" letter-spacing="30">漢界</text>`;
+            svgStr += `</svg>`;
+            document.getElementById('boardWrapper').insertAdjacentHTML('afterbegin', svgStr);
+        }
+
+        // 替换为这段新代码：加入了公网 ICE 服务器配置，支持跨网络 P2P 穿透
+        function initNetwork() {
+            peer = new Peer({
+                debug: 1,
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' },
+                        { urls: 'stun:stun.voipbuster.com' }
+                    ]
+                }
+            });
+
+            peer.on('open', (id) => { document.getElementById('myIdDisplay').innerText = id; });
+            peer.on('connection', (connection) => {
+                if (conn) { connection.close(); return; }
+                conn = connection; myRole = 'red'; setupConnectionListeners();
+                updateConnectionUI(true); updateOrientation(); log("Opponent connected. You play Red (First).");
+            });
+        }
+
+        function connectToPeer() {
+            const remoteId = document.getElementById('peerIdInput').value.trim();
+            if (!remoteId) return alert("Please enter the opponent's key!");
+            conn = peer.connect(remoteId); myRole = 'black'; setupConnectionListeners();
+        }
+
+        function setupConnectionListeners() {
+            conn.on('open', () => { updateConnectionUI(true); updateOrientation(); initBoard(); log("P2P connected! You play Black (Second)."); });
+            conn.on('data', (data) => {
+                if (data.type === 'move') executeMoveSync(data.from.r, data.from.c, data.to.r, data.to.c);
+                else if (data.type === 'reset') { resetBoardLocal(); log("Opponent reset the board."); }
+                else if (data.type === 'role_swap') { myRole = data.nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal(); log(`Auto-swapped colors. You are now: ${myRole}.`); }
+            });
+            conn.on('close', () => { conn = null; myRole = null; updateConnectionUI(false); updateOrientation(); log("Opponent left. Switched to Local Mode."); });
+        }
+
+        function createDOMGrid() {
+            const boardDOM = document.getElementById('board'); boardDOM.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell'; cell.dataset.row = r; cell.dataset.col = c;
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    boardDOM.appendChild(cell);
+                }
+            }
+        }
+
+        function initBoard() { resetBoardLocal(); if (conn && conn.open) conn.send({ type: 'reset' }); }
+        
+        function resetBoardLocal() {
+            boardState = Array(10).fill(null).map(() => Array(9).fill(null));
+            selectedCell = null; currentTurn = 'red'; lastMove = { from: null, to: null };
+            initialPieces.forEach(p => { boardState[p.r][p.c] = { type: p.type, color: p.color }; });
+            renderPieces(); updateTurnUI();
+        }
+
+        function renderPieces() {
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const cellDOM = document.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                    const childPiece = cellDOM.querySelector('.piece');
+                    if (childPiece) childPiece.remove();
+                    
+                    cellDOM.classList.remove('last-move');
+                    if ((lastMove.from && lastMove.from.r === r && lastMove.from.c === c) || (lastMove.to && lastMove.to.r === r && lastMove.to.c === c)) {
+                        cellDOM.classList.add('last-move');
+                    }
+                    const piece = boardState[r][c];
+                    if (piece) {
+                        const pieceDOM = document.createElement('div');
+                        pieceDOM.className = `piece ${piece.color}`; pieceDOM.innerText = piece.type;
+                        cellDOM.appendChild(pieceDOM);
+                    }
+                }
+            }
+        }
+
+        function updateOrientation() {
+            const wrapper = document.getElementById('boardWrapper');
+            if (myRole === 'black') wrapper.classList.add('flipped-view'); else wrapper.classList.remove('flipped-view'); 
+        }
+        function playChessSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                // Use triangle wave to mimic the hollow, dull thud of wooden blocks
+                oscillator.type = 'triangle'; 
+                oscillator.frequency.setValueAtTime(130, audioCtx.currentTime); // Base pitch
+                oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.08); // Rapid pitch drop
+                
+                // Fast volume decay to create a percussive impact
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.08);
+            } catch (e) {
+                console.log("Audio playback blocked or unsupported by browser: ", e);
+            }
+        }
+        function handleCellClick(r, c) {
+            if (myRole !== null) {
+                if (!conn || !conn.open) return;
+                if (currentTurn !== myRole) return;
+            }
+
+            const clickedPiece = boardState[r][c];
+
+            if (selectedCell) {
+                const currentMovingPiece = boardState[selectedCell.r][selectedCell.c];
+                if (clickedPiece && clickedPiece.color === currentMovingPiece.color) {
+                    clearSelectionHighlights(); selectPiece(r, c); return;
+                }
+
+                if (validateMove(selectedCell.r, selectedCell.c, r, c)) {
+                    if (isBlunderMove(selectedCell.r, selectedCell.c, r, c, currentTurn)) {
+                        log("⚠️ [FIREWALL] 送将/被将军！此步无效。");
+                        clearSelectionHighlights(); return;
+                    }
+
+                    if (myRole !== null && conn && conn.open) {
+                        conn.send({ type: 'move', from: { r: selectedCell.r, c: selectedCell.c }, to: { r: r, c: c } });
+                    }
+                    executeMoveSync(selectedCell.r, selectedCell.c, r, c);
+                } else {
+                    clearSelectionHighlights();
+                }
+            } else {
+                if (clickedPiece && clickedPiece.color === currentTurn) selectPiece(r, c); 
+            }
+        }
+
+        function selectPiece(r, c) {
+            selectedCell = { r, c };
+            document.querySelector(`[data-row='${r}'][data-col='${c}']`).classList.add('selected');
+
+            for (let tr = 0; tr < 10; tr++) {
+                for (let tc = 0; tc < 9; tc++) {
+                    if (validateMove(r, c, tr, tc)) {
+                        const cell = document.querySelector(`[data-row='${tr}'][data-col='${tc}']`);
+                        if (isBlunderMove(r, c, tr, tc, currentTurn)) cell.classList.add('blunder-target');
+                        else cell.classList.add('valid-target');
+                    }
+                }
+            }
+        }
+
+        function executeMoveSync(fromR, fromC, toR, toC) {
+            const movingPiece = boardState[fromR][fromC];
+            const targetPiece = boardState[toR][toC];
+            lastMove = { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } };
+            
+            boardState[toR][toC] = movingPiece; boardState[fromR][fromC] = null;
+            clearSelectionHighlights(); renderPieces();
+
+            if (targetPiece && (targetPiece.type === '將' || targetPiece.type === '帥' || targetPiece.type === '将' || targetPiece.type === '帅')) {
+                const winnerColor = movingPiece.color;
+                log(`Game Over! ${winnerColor.toUpperCase()} 斩首获胜！`);
+                confetti({ particleCount: 200, spread: 90 });
+                
+                if (myRole !== null) {
+                    if (winnerColor === myRole) matchStats.wins++; else matchStats.losses++; 
+                    localStorage.setItem('chess_p2p_stats', JSON.stringify(matchStats));
+                    updateStatsUI();
+
+                    setTimeout(() => {
+                        const nextRole = myRole === 'red' ? 'black' : 'red';
+                        conn.send({ type: 'role_swap', nextRole: myRole }); 
+                        myRole = nextRole;
+                        updateConnectionUI(true); updateOrientation(); resetBoardLocal();
+                        log(`[Auto-Swap] 新对局开启，您执：${myRole}。`);
+                    }, 4000);
+                }
+                currentTurn = null; updateTurnUI(); return;
+            }
+            currentTurn = currentTurn === 'red' ? 'black' : 'red'; updateTurnUI();
+            playChessSound();
+        }
+
+        // --- BUGFIX: The rewritten, highly accurate Anti-Blunder System ---
+        function isBlunderMove(fromR, fromC, toR, toC, side) {
+            const originalSource = boardState[fromR][fromC]; 
+            const originalTarget = boardState[toR][toC];
+            
+            // Simulate the board state after the move
+            boardState[toR][toC] = originalSource; 
+            boardState[fromR][fromC] = null;
+
+            let isBlunder = false; 
+            const opponentColor = side === 'red' ? 'black' : 'red';
+            
+            // Rule 1: The two Kings cannot face each other directly on an empty file
+            if (checkKingFaceToFace()) {
+                isBlunder = true; 
+            }
+
+            // Rule 2: Cannot leave your own King in check
+            if (!isBlunder) {
+                // Find my own king's new position (supporting both Simplified & Traditional characters)
+                let myKing = null;
+                for (let r = 0; r < 10; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        const p = boardState[r][c];
+                        if (p && p.color === side && (p.type === '帅' || p.type === '帥' || p.type === '将' || p.type === '將')) {
+                            myKing = { r, c };
+                            break;
+                        }
+                    }
+                    if (myKing) break;
+                }
+
+                if (myKing) {
+                    // Check if any enemy piece can legally move to myKing's coordinates
+                    for (let r = 0; r < 10; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const enemy = boardState[r][c];
+                            if (enemy && enemy.color === opponentColor) {
+                                if (validateMove(r, c, myKing.r, myKing.c, true)) { 
+                                    isBlunder = true; 
+                                    break; 
+                                }
+                            }
+                        }
+                        if (isBlunder) break;
+                    }
+                }
+            }
+            
+            // Revert state cleanup
+            boardState[fromR][fromC] = originalSource; 
+            boardState[toR][toC] = originalTarget;
+            return isBlunder;
+        }
+
+        function checkKingFaceToFace() {
+            let redKing = null, blackKing = null;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (boardState[r][c]?.type === '帅' || boardState[r][c]?.type === '帥') redKing = { r, c };
+                    if (boardState[r][c]?.type === '将' || boardState[r][c]?.type === '將') blackKing = { r, c };
+                }
+            }
+            if (!redKing || !blackKing || redKing.c !== blackKing.c) return false;
+            let minR = Math.min(redKing.r, blackKing.r), maxR = Math.max(redKing.r, blackKing.r);
+            for (let r = minR + 1; r < maxR; r++) { if (boardState[r][redKing.c]) return false; }
+            return true;
+        }
+
+        function clearSelectionHighlights() {
+            selectedCell = null;
+            document.querySelectorAll('.cell').forEach(el => { el.classList.remove('selected', 'valid-target', 'blunder-target'); });
+        }
+
+        // --- BUGFIX: The fixed Validator that recognizes both Simplified and Traditional ---
+        function validateMove(fromR, fromC, toR, toC, ignoreBlunderSim = false) {
+            const p = boardState[fromR][fromC]; const target = boardState[toR][toC];
+            if (!p || (target && target.color === p.color)) return false; 
+            const dr = toR - fromR; const dc = toC - fromC;
+            const absDr = Math.abs(dr); const absDc = Math.abs(dc);
+            
+            const countPiecesOnLine = (r1, c1, r2, c2) => {
+                let cnt = 0;
+                if (r1 === r2) {
+                    let minC = Math.min(c1, c2), maxC = Math.max(c1, c2);
+                    for (let c = minC + 1; c < maxC; c++) if (boardState[r1][c]) cnt++;
+                } else if (c1 === c2) {
+                    let minR = Math.min(r1, r2), maxR = Math.max(r1, r2);
+                    for (let r = minR + 1; r < maxR; r++) if (boardState[r][c1]) cnt++;
+                }
+                return cnt;
+            };
+
+            switch(p.type) {
+                case '车': case '車': if (fromR !== toR && fromC !== toC) return false; return countPiecesOnLine(fromR, fromC, toR, toC) === 0;
+                case '炮': case '砲': if (fromR !== toR && fromC !== toC) return false; let count = countPiecesOnLine(fromR, fromC, toR, toC); return !target ? count === 0 : count === 1;
+                case '马': case '馬': if ((absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2)) { if (absDr === 2 && boardState[fromR + dr/2][fromC]) return false; if (absDc === 2 && boardState[fromR][fromC + dc/2]) return false; return true; } return false;
+                case '象': case '相': if (absDr !== 2 || absDc !== 2) return false; if (p.color === 'red' && toR < 5) return false; if (p.color === 'black' && toR > 4) return false; return !boardState[fromR + dr/2][fromC + dc/2];
+                case '士': case '仕': if (absDr !== 1 || absDc !== 1 || toC < 3 || toC > 5) return false; return p.color === 'red' ? toR >= 7 : toR <= 2;
+                // [BUG FIXED] Now successfully recognizes BOTH simplified '将' and traditional '將'
+                case '将': case '將': case '帅': case '帥': if (absDr + absDc !== 1 || toC < 3 || toC > 5) return false; return p.color === 'red' ? toR >= 7 : toR <= 2;
+                case '兵': 
+                    if (dr === -1 && dc === 0) return true; 
+                    if (fromR <= 4 && dr === 0 && absDc === 1) return true; 
+                    return false;
+                case '卒': 
+                    if (dr === 1 && dc === 0) return true; 
+                    if (fromR >= 5 && dr === 0 && absDc === 1) return true; 
+                    return false;
+            }
+            return false;
+        }
+
+        function updateConnectionUI(isConnected) {
+            const badge = document.getElementById('connectionStatus'); const roleBadge = document.getElementById('roleStatus');
+            if (isConnected) {
+                badge.innerText = "Connected"; badge.className = "status-badge connected";
+                roleBadge.style.display = "inline-block"; roleBadge.innerText = myRole === 'red' ? "You: Red (First)" : "You: Black (Second)";
+            } else {
+                badge.innerText = "Local Mode"; badge.className = "status-badge local-mode"; roleBadge.style.display = "none";
+            }
+            updateTurnUI();
+        }
+
+        function updateTurnUI() {
+            const turnBadge = document.getElementById('turnStatus'); if (!currentTurn) { turnBadge.style.display = "none"; return; }
+            turnBadge.style.display = "inline-block"; const name = currentTurn === 'red' ? 'Red' : 'Black'; turnBadge.innerText = `Turn: ${name}`;
+            if (myRole !== null && currentTurn === myRole) { turnBadge.className = "status-badge your-turn"; turnBadge.innerText += " (Yours)"; } else { turnBadge.className = "status-badge"; }
+        }
+
+        function updateStatsUI() {
+            document.getElementById('statWins').innerText = matchStats.wins;
+            document.getElementById('statLosses').innerText = matchStats.losses;
+            const total = matchStats.wins + matchStats.losses;
+            document.getElementById('statRate').innerText = total === 0 ? "0%" : `${Math.round((matchStats.wins / total) * 100)}%`;
+        }
+
+        function copyRoomKey() { const id = document.getElementById('myIdDisplay').innerText; if(!id.includes("Generating")) navigator.clipboard.writeText(id).then(() => alert("Key Copied!")); }
+        function log(text) { const logBox = document.getElementById('logBox'); logBox.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${text}`; logBox.scrollTop = logBox.scrollHeight; }
+
+        renderSVGBoard(); createDOMGrid(); initBoard(); initNetwork(); updateStatsUI();
+    </script>
+</body>
+</html>
