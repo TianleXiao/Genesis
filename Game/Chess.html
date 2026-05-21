@@ -125,7 +125,11 @@
                 <div class="log-box" id="logBox">SVG Board rendering initialized. Traditional Chinese layout active.</div>
             </div>
             
-            <button class="btn btn-secondary" style="width: 100%;" onclick="initBoard()">Reset Match</button>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button class="btn btn-secondary" style="flex: 1;" onclick="requestUndo()">求情悔棋</button>
+                <button class="btn btn-secondary" style="flex: 1;" onclick="requestDraw()">提议和棋</button>
+            </div>
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="initBoard()">Reset Match</button>
         </div>
 
         <div class="board-wrapper" id="boardWrapper">
@@ -141,6 +145,7 @@
         let peer = null;
         let conn = null;
         let lastMove = { from: null, to: null };
+        let moveHistory = []; // Used to track each step for undo features
 
         let matchStats = JSON.parse(localStorage.getItem('chess_p2p_stats')) || { wins: 0, losses: 0 };
 
@@ -205,7 +210,6 @@
             document.getElementById('boardWrapper').insertAdjacentHTML('afterbegin', svgStr);
         }
 
-        // 替换为这段新代码：加入了公网 ICE 服务器配置，支持跨网络 P2P 穿透
         function initNetwork() {
             peer = new Peer({
                 debug: 1,
@@ -238,9 +242,55 @@
         function setupConnectionListeners() {
             conn.on('open', () => { updateConnectionUI(true); updateOrientation(); initBoard(); log("P2P connected! You play Black (Second)."); });
             conn.on('data', (data) => {
-                if (data.type === 'move') executeMoveSync(data.from.r, data.from.c, data.to.r, data.to.c);
-                else if (data.type === 'reset') { resetBoardLocal(); log("Opponent reset the board."); }
-                else if (data.type === 'role_swap') { myRole = data.nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal(); log(`Auto-swapped colors. You are now: ${myRole}.`); }
+                if (data.type === 'move') {
+                    executeMoveSync(data.from.r, data.from.c, data.to.r, data.to.c);
+                } else if (data.type === 'reset') {
+                    resetBoardLocal(); log("Opponent reset the board.");
+                } else if (data.type === 'role_swap') {
+                    myRole = data.nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal(); log(`Auto-swapped colors. You are now: ${myRole}.`);
+                } else if (data.type === 'undo_request') {
+                    const accept = confirm("Opponent requested to undo the last move. Do you agree?");
+                    if (accept) {
+                        executeUndoLocal();
+                        conn.send({ type: 'undo_response', accept: true });
+                        log("You accepted the undo request.");
+                    } else {
+                        conn.send({ type: 'undo_response', accept: false });
+                        log("You rejected the undo request.");
+                    }
+                } else if (data.type === 'undo_response') {
+                    if (data.accept) {
+                        executeUndoLocal();
+                        alert("Opponent accepted your undo request!");
+                        log("Undo request APPROVED.");
+                    } else {
+                        alert("Opponent rejected your undo request.");
+                        log("Undo request REJECTED.");
+                    }
+                } else if (data.type === 'draw_request') {
+                    const accept = confirm("Opponent offered a draw. Do you accept the tie?");
+                    if (accept) {
+                        currentTurn = null;
+                        updateTurnUI();
+                        conn.send({ type: 'draw_response', accept: true });
+                        confetti({ particleCount: 100, spread: 60 });
+                        log("Match ended in a mutual Draw!");
+                    } else {
+                        conn.send({ type: 'draw_response', accept: false });
+                        log("You refused the draw offer.");
+                    }
+                } else if (data.type === 'draw_response') {
+                    if (data.accept) {
+                        currentTurn = null;
+                        updateTurnUI();
+                        confetti({ particleCount: 100, spread: 60 });
+                        alert("Opponent accepted! The match is a Draw.");
+                        log("Match ended in a mutual Draw!");
+                    } else {
+                        alert("Opponent rejected your draw offer.");
+                        log("Draw offer REJECTED.");
+                    }
+                }
             });
             conn.on('close', () => { conn = null; myRole = null; updateConnectionUI(false); updateOrientation(); log("Opponent left. Switched to Local Mode."); });
         }
@@ -262,6 +312,7 @@
         function resetBoardLocal() {
             boardState = Array(10).fill(null).map(() => Array(9).fill(null));
             selectedCell = null; currentTurn = 'red'; lastMove = { from: null, to: null };
+            moveHistory = []; 
             initialPieces.forEach(p => { boardState[p.r][p.c] = { type: p.type, color: p.color }; });
             renderPieces(); updateTurnUI();
         }
@@ -291,18 +342,17 @@
             const wrapper = document.getElementById('boardWrapper');
             if (myRole === 'black') wrapper.classList.add('flipped-view'); else wrapper.classList.remove('flipped-view'); 
         }
+
         function playChessSound() {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
                 
-                // Use triangle wave to mimic the hollow, dull thud of wooden blocks
                 oscillator.type = 'triangle'; 
-                oscillator.frequency.setValueAtTime(130, audioCtx.currentTime); // Base pitch
-                oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.08); // Rapid pitch drop
+                oscillator.frequency.setValueAtTime(130, audioCtx.currentTime); 
+                oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.08); 
                 
-                // Fast volume decay to create a percussive impact
                 gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
                 
@@ -315,6 +365,7 @@
                 console.log("Audio playback blocked or unsupported by browser: ", e);
             }
         }
+
         function handleCellClick(r, c) {
             if (myRole !== null) {
                 if (!conn || !conn.open) return;
@@ -365,6 +416,13 @@
         function executeMoveSync(fromR, fromC, toR, toC) {
             const movingPiece = boardState[fromR][fromC];
             const targetPiece = boardState[toR][toC];
+            
+            moveHistory.push({
+                board: JSON.parse(JSON.stringify(boardState)),
+                turn: currentTurn,
+                lastMove: { ...lastMove }
+            });
+
             lastMove = { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } };
             
             boardState[toR][toC] = movingPiece; boardState[fromR][fromC] = null;
@@ -388,32 +446,29 @@
                         log(`[Auto-Swap] 新对局开启，您执：${myRole}。`);
                     }, 4000);
                 }
-                currentTurn = null; updateTurnUI(); return;
+                currentTurn = null; updateTurnUI(); 
+                playChessSound();
+                return;
             }
             currentTurn = currentTurn === 'red' ? 'black' : 'red'; updateTurnUI();
             playChessSound();
         }
 
-        // --- BUGFIX: The rewritten, highly accurate Anti-Blunder System ---
         function isBlunderMove(fromR, fromC, toR, toC, side) {
             const originalSource = boardState[fromR][fromC]; 
             const originalTarget = boardState[toR][toC];
             
-            // Simulate the board state after the move
             boardState[toR][toC] = originalSource; 
             boardState[fromR][fromC] = null;
 
             let isBlunder = false; 
             const opponentColor = side === 'red' ? 'black' : 'red';
             
-            // Rule 1: The two Kings cannot face each other directly on an empty file
             if (checkKingFaceToFace()) {
                 isBlunder = true; 
             }
 
-            // Rule 2: Cannot leave your own King in check
             if (!isBlunder) {
-                // Find my own king's new position (supporting both Simplified & Traditional characters)
                 let myKing = null;
                 for (let r = 0; r < 10; r++) {
                     for (let c = 0; c < 9; c++) {
@@ -427,7 +482,6 @@
                 }
 
                 if (myKing) {
-                    // Check if any enemy piece can legally move to myKing's coordinates
                     for (let r = 0; r < 10; r++) {
                         for (let c = 0; c < 9; c++) {
                             const enemy = boardState[r][c];
@@ -443,7 +497,6 @@
                 }
             }
             
-            // Revert state cleanup
             boardState[fromR][fromC] = originalSource; 
             boardState[toR][toC] = originalTarget;
             return isBlunder;
@@ -468,7 +521,6 @@
             document.querySelectorAll('.cell').forEach(el => { el.classList.remove('selected', 'valid-target', 'blunder-target'); });
         }
 
-        // --- BUGFIX: The fixed Validator that recognizes both Simplified and Traditional ---
         function validateMove(fromR, fromC, toR, toC, ignoreBlunderSim = false) {
             const p = boardState[fromR][fromC]; const target = boardState[toR][toC];
             if (!p || (target && target.color === p.color)) return false; 
@@ -493,7 +545,6 @@
                 case '马': case '馬': if ((absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2)) { if (absDr === 2 && boardState[fromR + dr/2][fromC]) return false; if (absDc === 2 && boardState[fromR][fromC + dc/2]) return false; return true; } return false;
                 case '象': case '相': if (absDr !== 2 || absDc !== 2) return false; if (p.color === 'red' && toR < 5) return false; if (p.color === 'black' && toR > 4) return false; return !boardState[fromR + dr/2][fromC + dc/2];
                 case '士': case '仕': if (absDr !== 1 || absDc !== 1 || toC < 3 || toC > 5) return false; return p.color === 'red' ? toR >= 7 : toR <= 2;
-                // [BUG FIXED] Now successfully recognizes BOTH simplified '将' and traditional '將'
                 case '将': case '將': case '帅': case '帥': if (absDr + absDc !== 1 || toC < 3 || toC > 5) return false; return p.color === 'red' ? toR >= 7 : toR <= 2;
                 case '兵': 
                     if (dr === -1 && dc === 0) return true; 
@@ -533,6 +584,47 @@
 
         function copyRoomKey() { const id = document.getElementById('myIdDisplay').innerText; if(!id.includes("Generating")) navigator.clipboard.writeText(id).then(() => alert("Key Copied!")); }
         function log(text) { const logBox = document.getElementById('logBox'); logBox.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${text}`; logBox.scrollTop = logBox.scrollHeight; }
+
+        function requestUndo() {
+            if (!currentTurn) return alert("Game is already over!");
+            if (moveHistory.length === 0) return alert("No moves to undo!");
+            
+            if (conn && conn.open) {
+                if (currentTurn === myRole) {
+                    alert("It's your turn, you can only request undo after opponent's move!");
+                    return;
+                }
+                log("Sending undo request to opponent...");
+                conn.send({ type: 'undo_request' });
+            } else {
+                executeUndoLocal();
+                log("Local Undo executed.");
+            }
+        }
+
+        function executeUndoLocal() {
+            if (moveHistory.length === 0) return;
+            const previousState = moveHistory.pop();
+            boardState = previousState.board;
+            currentTurn = previousState.turn;
+            lastMove = previousState.lastMove;
+            
+            clearSelectionHighlights();
+            renderPieces();
+            updateTurnUI();
+        }
+
+        function requestDraw() {
+            if (!currentTurn) return alert("Game is already over!");
+            if (conn && conn.open) {
+                log("Proposing a draw to opponent...");
+                conn.send({ type: 'draw_request' });
+            } else {
+                log("Local Mode: Game declared as a Draw.");
+                currentTurn = null;
+                updateTurnUI();
+            }
+        }
 
         renderSVGBoard(); createDOMGrid(); initBoard(); initNetwork(); updateStatsUI();
     </script>
