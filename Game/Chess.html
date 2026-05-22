@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Chinese Chess - Traditional Masterpiece Pro</title>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         :root {
@@ -46,6 +46,9 @@
         .btn:hover { background: #e5e5e5; transform: translateY(-1px); }
         .btn-secondary { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
         .btn-secondary:hover { color: #fff; border-color: #888; background: rgba(255,255,255,0.02); }
+        
+        .btn-danger { background: #222; color: #ff4d4d; border: 1px solid #442222; }
+        .btn-danger:hover { background: #331111; border-color: #ff4d4d; }
 
         .status-area { display: flex; flex-wrap: wrap; gap: 6px; }
         .status-badge { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; background: #222; color: var(--text-dim); }
@@ -116,6 +119,47 @@
         input:checked + .slider { background-color: #8a50ff; border-color: #8a50ff; }
         input:checked + .slider:before { transform: translateX(16px); background-color: #fff; }
 
+        /* Premium Minimalist Monochromatic Celebration Overlay Styles */
+        .celebration-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(10, 10, 12, 0.88); backdrop-filter: blur(12px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999; opacity: 0; pointer-events: none;
+            transition: opacity 0.5s var(--ease);
+        }
+        .celebration-overlay.active { opacity: 1; pointer-events: auto; }
+        .celebration-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 48px 64px; text-align: center;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05);
+            transform: scale(0.85); transition: transform 0.5s var(--ease);
+        }
+        .celebration-overlay.active .celebration-card { transform: scale(1); }
+        .celebration-title { font-size: 3.2rem; font-weight: 200; letter-spacing: 0.15em; margin-bottom: 12px; text-transform: uppercase; color: #ffffff; }
+        .celebration-subtitle { font-size: 1.1rem; color: var(--text-dim); margin-bottom: 32px; font-weight: 300; }
+
+        /* Modern Monochromatic Material Danger Banner Styles */
+        .danger-banner {
+            position: absolute; top: var(--board-pad); left: var(--board-pad);
+            width: calc(100% - 2 * var(--board-pad)); height: calc(100% - 2 * var(--board-pad));
+            background: rgba(10, 10, 12, 0.82); backdrop-filter: blur(8px);
+            border-radius: 6px; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 2000;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease);
+            border: 1px solid rgba(255, 77, 77, 0.15);
+        }
+        .danger-banner.active { opacity: 1; pointer-events: auto; }
+        .danger-content {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 28px 36px; max-width: 420px; width: 90%;
+            text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            transform: translateY(15px); transition: transform 0.3s var(--ease);
+        }
+        .danger-banner.active .danger-content { transform: translateY(0); }
+        .danger-title { font-size: 1.1rem; font-weight: 600; color: #ff4d4d; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+        .danger-desc { font-size: 0.88rem; color: var(--text-main); line-height: 1.6; margin-bottom: 24px; }
+        .danger-actions { display: flex; gap: 12px; justify-content: center; }
+
         @media (max-width: 950px) {
             body { padding: 20px 10px; }
             .container { flex-direction: column-reverse; gap: 20px; }
@@ -124,6 +168,14 @@
     </style>
 </head>
 <body>
+
+    <div id="celebrationOverlay" class="celebration-overlay">
+        <div class="celebration-card">
+            <div id="celebrationTitle" class="celebration-title">VICTORY</div>
+            <div id="celebrationSubtitle" class="celebration-subtitle">Match completed beautifully.</div>
+            <button class="btn" onclick="document.getElementById('celebrationOverlay').classList.remove('active')">返回局势</button>
+        </div>
+    </div>
 
     <div class="container">
         <div class="sidebar">
@@ -191,6 +243,17 @@
         </div>
 
         <div class="board-wrapper" id="boardWrapper">
+            <div id="dangerBanner" class="danger-banner">
+                <div class="danger-content">
+                    <div class="danger-title">⚠️ 失子风险提示</div>
+                    <div id="dangerDesc" class="danger-desc">当前走法会导致您的棋子处于敌方火网之下，极大概率会被直接吃掉。确定要继续吗？</div>
+                    <div class="danger-actions">
+                        <button class="btn btn-danger" id="dangerConfirmBtn">执意如此</button>
+                        <button class="btn btn-secondary" onclick="cancelPendingMove()">容我三思</button>
+                    </div>
+                </div>
+            </div>
+            
             <svg class="trajectory-layer" id="trajectoryLayer" xmlns="http://www.w3.org/2000/svg"></svg>
             <div class="chess-board" id="board"></div>
         </div>
@@ -201,11 +264,18 @@
         let selectedCell = null;
         let myRole = null; 
         let currentTurn = 'red'; 
-        let peer = null;
-        let conn = null;
         let lastMove = { from: null, to: null };
         let moveHistory = [];
         let assistModeActive = false;
+        
+        // Context pointer mapping to hold intent vectors during risk assessment interruptions
+        let pendingMoveContext = null;
+
+        // MQTT Protocol variables replacing WebRTC state machines
+        let mqttClient = null;
+        let currentRoomTopic = '';
+        const myUniqueId = 'UID_' + Math.random().toString(36).substr(2, 9);
+        let myRoomId = '';
 
         let matchStats = JSON.parse(localStorage.getItem('chess_p2p_stats')) || { wins: 0, losses: 0 };
 
@@ -273,83 +343,137 @@
             document.getElementById('boardWrapper').insertAdjacentHTML('afterbegin', svgStr);
         }
 
+        // Network engine using standard MQTT pub/sub room system
         function initNetwork() {
-            // Set debug to 3 for maximum logging verbosity in Console to trace ICE handshakes
-            peer = new Peer({ 
-                debug: 3,
-                config: {
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
-                        { urls: 'stun:stun.nextcloud.com:443' }
-                    ],
-                    'sdpSemantics': 'unified-plan'
+            myRoomId = 'ROOM-' + Math.floor(100000 + Math.random() * 900000);
+            document.getElementById('myIdDisplay').innerText = myRoomId;
+            currentRoomTopic = `chess/room/${myRoomId}`;
+
+            log("正在连接云端分布式中转集群...");
+            mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+
+            mqttClient.on('connect', () => {
+                log("已成功桥接至实时数据节点。正在监听本地棋局房间...");
+                mqttClient.subscribe(currentRoomTopic);
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    if (data.senderId === myUniqueId) return;
+                    handleNetworkData(data);
+                } catch (e) {
+                    console.error("Failed to parse incoming packet matrix: ", e);
                 }
             });
 
-            peer.on('open', (id) => { 
-                document.getElementById('myIdDisplay').innerText = id; 
-                log("P2P Network engine initialized. Waiting for peers...");
-            });
-
-            peer.on('connection', (connection) => {
-                if (conn) { connection.close(); return; }
-                conn = connection; myRole = 'red'; setupConnectionListeners();
-                updateConnectionUI(true); updateOrientation(); log("对家已连接。你执红方 (先手)。");
-            });
-
-            // Comprehensive error diagnostics for underlying WebRTC signaling failure
-            peer.on('error', (err) => {
-                console.error('PeerJS Internal Error Context:', err);
-                log(`❌ [网络故障] 核心错误代码: ${err.type}`);
-                if (err.type === 'network') {
-                    log("提示: 与公用信令服务器握手断开，可能因本地 network 被墙或无因特网。");
-                } else if (err.type === 'peer-unavailable') {
-                    log("提示: 找不到目标房间密钥。请检查是否粘错，或者对方已关闭网页。");
-                } else if (err.type === 'webrtc') {
-                    log("提示: 关键防火墙拦截！由于对称型NAT或校园网策略，P2P穿透打洞宣告失败。");
-                }
+            mqttClient.on('error', (err) => {
+                console.error('MQTT Global Socket Context Error:', err);
+                log(`❌ [网络故障] 中转数据传输阻断: ${err.message}`);
             });
         }
 
         function connectToPeer() {
             const remoteId = document.getElementById('peerIdInput').value.trim();
             if (!remoteId) return alert("请输入合法的棋室密钥！");
-            log("正在发起连接请求，开始交换 STUN 打洞数据包...");
-            conn = peer.connect(remoteId); myRole = 'black'; setupConnectionListeners();
+            if (remoteId === myRoomId) return alert("无法加入您自己本地创建的棋局！");
+
+            log(`正在切断本地信道，迁移至对端数据总线: ${remoteId}...`);
+            
+            mqttClient.unsubscribe(currentRoomTopic);
+            currentRoomTopic = `chess/room/${remoteId}`;
+            mqttClient.subscribe(currentRoomTopic);
+
+            myRole = 'black';
+            sendMqttMessage('join');
         }
 
-        function setupConnectionListeners() {
-            conn.on('open', () => { updateConnectionUI(true); updateOrientation(); initBoard(); log("对战室已构建！你执黑方 (后手)。"); });
-            conn.on('data', (data) => {
-                if (data.type === 'move') {
-                    executeMoveSync(data.from.r, data.from.c, data.to.r, data.to.c);
-                } else if (data.type === 'reset') {
-                    resetBoardLocal(); log("对方重启了棋盘。");
-                } else if (data.type === 'role_swap') {
-                    myRole = data.nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal(); log(`换位思考，本局你换执: ${myRole === 'red'?'红方':'黑方'}`);
-                } else if (data.type === 'undo_request') {
-                    if (confirm("对方请求悔棋一步，是否高抬贵手？")) {
-                        executeUndoLocal(); conn.send({ type: 'undo_response', accept: true }); log("你同意了对方的悔棋。");
-                    } else {
-                        conn.send({ type: 'undo_response', accept: false }); log("你拒绝了对方的悔棋。");
-                    }
-                } else if (data.type === 'undo_response') {
-                    if (data.accept) { executeUndoLocal(); log("对方同意了你的悔棋申请。"); } else { log("悔棋被无情拒绝。"); }
-                } else if (data.type === 'draw_request') {
-                    if (confirm("对方提议言和，接受言和吗？")) {
-                        currentTurn = null; updateTurnUI(); conn.send({ type: 'draw_response', accept: true });
-                        confetti({ particleCount: 100, spread: 60 }); log("握手言和，本局以平局告终。");
-                    } else { conn.send({ type: 'draw_response', accept: false }); log("你拒绝了平局协议。"); }
-                } else if (data.type === 'draw_response') {
-                    if (data.accept) { currentTurn = null; updateTurnUI(); confetti({ particleCount: 100, spread: 60 }); log("对方同意平局。"); } else { log("对方拒绝和棋。"); }
+        function sendMqttMessage(type, extraPayload = {}) {
+            if (!mqttClient || !currentRoomTopic) return;
+            const messageObj = {
+                type: type,
+                senderId: myUniqueId,
+                ...extraPayload
+            };
+            mqttClient.publish(currentRoomTopic, JSON.stringify(messageObj));
+        }
+
+        function handleNetworkData(data) {
+            if (data.type === 'join') {
+                myRole = 'red';
+                updateConnectionUI(true);
+                updateOrientation();
+                initBoard();
+                log("对家已加入网络对局房间。你执红方 (先手)。");
+                sendMqttMessage('join_ack');
+            } else if (data.type === 'join_ack') {
+                myRole = 'black';
+                updateConnectionUI(true);
+                updateOrientation();
+                initBoard();
+                log("对战棋室已成功构建！你执黑方 (后手)。");
+            } else if (data.type === 'move') {
+                executeMoveSync(data.from.r, data.from.c, data.to.r, data.to.c);
+            } else if (data.type === 'reset') {
+                resetBoardLocal(); log("对方重启了棋盘。");
+            } else if (data.type === 'role_swap') {
+                myRole = data.nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal(); log(`换位思考，本局你换执: ${myRole === 'red'?'红方':'黑方'}`);
+            } else if (data.type === 'undo_request') {
+                if (confirm("对方请求悔棋一步，是否高抬贵手？")) {
+                    executeUndoLocal(); sendMqttMessage('undo_response', { accept: true }); log("你同意了对方的悔棋。");
+                } else {
+                    sendMqttMessage('undo_response', { accept: false }); log("你拒绝了对方的悔棋。");
                 }
-            });
-            conn.on('close', () => { conn = null; myRole = null; updateConnectionUI(false); updateOrientation(); log("对方退出了对局，自动切回单机演练。"); });
-            conn.on('error', (err) => { log(`[DataChannel Error] 传输通道发生错误: ${err}`); });
+            } else if (data.type === 'undo_response') {
+                if (data.accept) { executeUndoLocal(); log("对方同意了你的悔棋申请。"); } else { log("悔棋被无情拒绝。"); }
+            } else if (data.type === 'draw_request') {
+                if (confirm("对方提议言和，接受言和吗？")) {
+                    currentTurn = null; updateTurnUI(); sendMqttMessage('draw_response', { accept: true });
+                    showCelebration('draw'); log("握手言和，本局以平局告终。");
+                } else { sendMqttMessage('draw_response', { accept: false }); log("你拒绝了平局协议。"); }
+            } else if (data.type === 'draw_response') {
+                if (data.accept) { currentTurn = null; updateTurnUI(); showCelebration('draw'); log("对方同意平局。"); } else { log("对方拒绝和棋。"); }
+            }
+        }
+
+        // Celebration sequence handler using canvas-confetti bursts
+        function showCelebration(winner) {
+            const overlay = document.getElementById('celebrationOverlay');
+            const titleEl = document.getElementById('celebrationTitle');
+            const subtitleEl = document.getElementById('celebrationSubtitle');
+            
+            let titleText = "MATCH OVER";
+            let subtitleText = "对局结束。";
+
+            if (winner === 'draw') {
+                titleText = "DRAW";
+                subtitleText = "棋逢对手，双方各展谋略、握手言和。";
+            } else if (myRole === null) {
+                titleText = winner === 'red' ? "红方绝杀" : "黑方绝杀";
+                subtitleText = "演练分析结束，目标主将已被攻陷。";
+            } else if (winner === myRole) {
+                titleText = "VICTORY";
+                subtitleText = "算无遗策，运筹帷幄之中，决胜千里之外！";
+
+                let duration = 3.5 * 1000;
+                let animationEnd = Date.now() + duration;
+                (function frame() {
+                    confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.85 } });
+                    confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.85 } });
+                    if (Date.now() < animationEnd) requestAnimationFrame(frame);
+                }());
+            } else {
+                titleText = "DEFEAT";
+                subtitleText = "大意失荆州，棋差一招，卷土重来犹未晚也。";
+            }
+
+            titleEl.innerText = titleText;
+            subtitleEl.innerText = subtitleText;
+            overlay.classList.add('active');
+
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 3500);
         }
 
         function createDOMGrid() {
@@ -364,7 +488,7 @@
             }
         }
 
-        function initBoard() { resetBoardLocal(); if (conn && conn.open) conn.send({ type: 'reset' }); }
+        function initBoard() { resetBoardLocal(); sendMqttMessage('reset'); }
         
         function resetBoardLocal() {
             boardState = Array(10).fill(null).map(() => Array(9).fill(null));
@@ -372,6 +496,7 @@
             moveHistory = []; document.getElementById('trajectoryLayer').innerHTML = '';
             initialPieces.forEach(p => { boardState[p.r][p.c] = { type: p.type, color: p.color }; });
             renderPieces(); updateTurnUI(); evaluateAndDisplayWinRate(); clearAssistHighlights();
+            cancelPendingMove();
             if (assistModeActive) calculateBestMove();
         }
 
@@ -406,9 +531,6 @@
             const CS = 64; const half = CS / 2;
             let startX = fromC * CS + half; let startY = fromR * CS + half;
             let endX = toC * CS + half; let endY = toR * CS + half;
-            
-            // Fixed: Removed the manual coordinate reflection for black role, 
-            // since CSS flipped-view transforms the entire board element including the SVG layer perfectly.
 
             const midX = (startX + endX) / 2; const midY = (startY + endY) / 2;
             const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
@@ -445,8 +567,11 @@
 
         function handleCellClick(r, c) {
             if (myRole !== null) {
-                if (!conn || !conn.open || currentTurn !== myRole) return;
+                if (currentTurn !== myRole) return;
             }
+            // Block structural click registration while the risk confirmation window is active
+            if (pendingMoveContext) return;
+
             const clickedPiece = boardState[r][c];
 
             if (selectedCell) {
@@ -460,14 +585,83 @@
                         log("⚠️ 送将或仍处于将军状态！此步走法不成立。");
                         clearSelectionHighlights(); return;
                     }
-                    if (myRole !== null && conn && conn.open) {
-                        conn.send({ type: 'move', from: { r: selectedCell.r, c: selectedCell.c }, to: { r: r, c: c } });
+                    
+                    // Evaluate standard tactical material risk index before shifting coordinates
+                    if (isCapturedRiskMove(selectedCell.r, selectedCell.c, r, c, currentTurn)) {
+                        triggerRiskInterruption(selectedCell.r, selectedCell.c, r, c);
+                    } else {
+                        commitPieceMovement(selectedCell.r, selectedCell.c, r, c);
                     }
-                    executeMoveSync(selectedCell.r, selectedCell.c, r, c);
                 } else { clearSelectionHighlights(); }
             } else {
                 if (clickedPiece && clickedPiece.color === currentTurn) selectPiece(r, c); 
             }
+        }
+
+        // Intercept movement intent and spin up the overlay view model
+        function triggerRiskInterruption(fromR, fromC, toR, toC) {
+            const movingPiece = boardState[fromR][fromC];
+            pendingMoveContext = { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } };
+            
+            document.getElementById('dangerDesc').innerText = `移动您的 [${movingPiece.type}] 到 (${toR}, ${toC}) 将直接暴露在对方火网中，有被吃子的风险！确定执意前进吗？`;
+            document.getElementById('dangerBanner').classList.add('active');
+            
+            // Map continuous confirmation callback triggers explicitly
+            document.getElementById('dangerConfirmBtn').onclick = () => {
+                const ctx = pendingMoveContext;
+                cancelPendingMove(); // Dismiss modal layer safely
+                commitPieceMovement(ctx.from.r, ctx.from.c, ctx.to.r, ctx.to.c);
+            };
+        }
+
+        function cancelPendingMove() {
+            pendingMoveContext = null;
+            document.getElementById('dangerBanner').classList.remove('active');
+            clearSelectionHighlights();
+        }
+
+        // Finalize transaction execution sequence safely across contexts
+        function commitPieceMovement(fromR, fromC, toR, toC) {
+            if (myRole !== null) {
+                sendMqttMessage('move', { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
+            }
+            executeMoveSync(fromR, fromC, toR, toC);
+        }
+
+        // Simulate matrix transformations to identify incoming interception risks
+        function isCapturedRiskMove(fromR, fromC, toR, toC, currentSide) {
+            const tempSourcePiece = boardState[fromR][fromC];
+            const tempTargetPiece = boardState[toR][toC];
+            const opponentColor = currentSide === 'red' ? 'black' : 'red';
+            let riskDetected = false;
+
+            // Execute local shadow matrix branch conversion
+            boardState[toR][toC] = tempSourcePiece;
+            boardState[fromR][fromC] = null;
+
+            // Probe opponent's structural vectors for valid interception fields
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const enemyPiece = boardState[r][c];
+                    if (enemyPiece && enemyPiece.color === opponentColor) {
+                        // Pass true flag to structural validators to secure edge computation constraints
+                        if (validateMove(r, c, toR, toC, true)) {
+                            // Verify that this specific move doesn't leave the opponent in an invalid blunder state itself
+                            if (!isBlunderMove(r, c, toR, toC, opponentColor)) {
+                                riskDetected = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (riskDetected) break;
+            }
+
+            // Revert spatial matrix layer to maintain parity
+            boardState[fromR][fromC] = tempSourcePiece;
+            boardState[toR][toC] = tempTargetPiece;
+
+            return riskDetected;
         }
 
         function selectPiece(r, c) {
@@ -495,7 +689,6 @@
             boardState[toR][toC] = movingPiece; boardState[fromR][fromC] = null;
             clearSelectionHighlights(); renderPieces(); drawTrajectory(fromR, fromC, toR, toC); evaluateAndDisplayWinRate();
 
-            // Check if the game has ended by capture or checkmate/stalemate
             let gameOver = false;
             let winner = null;
 
@@ -504,7 +697,6 @@
                 winner = movingPiece.color;
                 log(`[绝杀] ${winner === 'red' ? '红方' : '黑方'} 达成将死，获得胜利！`);
             } else {
-                // Check if the opponent has any legal moves left (Checkmate or Stalemate detection)
                 const nextPlayerColor = currentTurn === 'red' ? 'black' : 'red';
                 let hasLegalMove = false;
 
@@ -527,20 +719,20 @@
 
                 if (!hasLegalMove) {
                     gameOver = true;
-                    winner = currentTurn; // The player who just made the move wins
+                    winner = currentTurn; 
                     log(`[绝杀] ${winner === 'red' ? '红方' : '黑方'} 达成将死/困毙，获得胜利！`);
                 }
             }
 
             if (gameOver) {
-                confetti({ particleCount: 180, spread: 80 });
+                showCelebration(winner);
                 if (myRole !== null) {
                     if (winner === myRole) matchStats.wins++; else matchStats.losses++;
                     localStorage.setItem('chess_p2p_stats', JSON.stringify(matchStats));
                     updateStatsUI();
                     setTimeout(() => {
                         const nextRole = myRole === 'red' ? 'black' : 'red';
-                        conn.send({ type: 'role_swap', nextRole: myRole });
+                        sendMqttMessage('role_swap', { nextRole: myRole });
                         myRole = nextRole; updateConnectionUI(true); updateOrientation(); resetBoardLocal();
                     }, 4000);
                 }
@@ -747,9 +939,9 @@
         function requestUndo() {
             if (!currentTurn) return alert("对局已结束！");
             if (moveHistory.length === 0) return alert("没有可以撤销的步骤。");
-            if (conn && conn.open) {
+            if (myRole !== null) {
                 if (currentTurn === myRole) return alert("必须在对方回合期间才能申请悔棋！");
-                log("正在向对方发送悔棋请求..."); conn.send({ type: 'undo_request' });
+                log("正在向对方发送悔棋请求..."); sendMqttMessage('undo_request');
             } else { executeUndoLocal(); log("本地悔棋成功。"); }
         }
 
@@ -759,13 +951,14 @@
             boardState = prev.board; currentTurn = prev.turn; lastMove = prev.lastMove;
             document.getElementById('trajectoryLayer').innerHTML = '';
             clearSelectionHighlights(); renderPieces(); updateTurnUI(); evaluateAndDisplayWinRate();
+            cancelPendingMove();
             if (assistModeActive) calculateBestMove();
         }
 
         function requestDraw() {
             if (!currentTurn) return alert("比赛已经结束。");
-            if (conn && conn.open) { log("正在向对家发送和棋协议..."); conn.send({ type: 'draw_request' }); } 
-            else { log("单机演练：直接以平局闭幕。"); currentTurn = null; updateTurnUI(); }
+            if (myRole !== null) { log("正在向对家发送和棋协议..."); sendMqttMessage('draw_request'); } 
+            else { log("单机演练：直接以平局闭幕。"); currentTurn = null; updateTurnUI(); showCelebration('draw'); }
         }
 
         renderSVGBoard(); createDOMGrid(); initBoard(); initNetwork(); updateStatsUI();
