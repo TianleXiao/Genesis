@@ -106,10 +106,14 @@
 
         .trajectory-path { fill: none; stroke: #8a50ff; stroke-width: 2; stroke-dasharray: 4 5; animation: dash 1.2s linear infinite; opacity: 0.75; }
 
+        /* Flipped view styles for Black player role perspective */
         .flipped-view { transform: rotate(180deg); }
         .flipped-view .piece { transform: rotate(180deg); }
         .flipped-view .cell.selected .piece { transform: scale(1.16) translateY(-3px) rotate(180deg); }
         .flipped-view .svg-layer text { transform: rotate(180deg); transform-origin: center; }
+        
+        /* Counter-rotate danger banner to stay right-side-up when board is inverted */
+        .flipped-view #dangerBanner { transform: rotate(180deg); }
 
         .switch-wrap { display: flex; align-items: center; gap: 6px; }
         .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
@@ -145,7 +149,7 @@
             background: rgba(10, 10, 12, 0.82); backdrop-filter: blur(8px);
             border-radius: 6px; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 2000;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
             border: 1px solid rgba(255, 77, 77, 0.15);
         }
         .danger-banner.active { opacity: 1; pointer-events: auto; }
@@ -436,7 +440,6 @@
             }
         }
 
-        // Celebration sequence handler using canvas-confetti bursts
         function showCelebration(winner) {
             const overlay = document.getElementById('celebrationOverlay');
             const titleEl = document.getElementById('celebrationTitle');
@@ -569,7 +572,6 @@
             if (myRole !== null) {
                 if (currentTurn !== myRole) return;
             }
-            // Block structural click registration while the risk confirmation window is active
             if (pendingMoveContext) return;
 
             const clickedPiece = boardState[r][c];
@@ -586,7 +588,6 @@
                         clearSelectionHighlights(); return;
                     }
                     
-                    // Evaluate standard tactical material risk index before shifting coordinates
                     if (isCapturedRiskMove(selectedCell.r, selectedCell.c, r, c, currentTurn)) {
                         triggerRiskInterruption(selectedCell.r, selectedCell.c, r, c);
                     } else {
@@ -598,7 +599,6 @@
             }
         }
 
-        // Intercept movement intent and spin up the overlay view model
         function triggerRiskInterruption(fromR, fromC, toR, toC) {
             const movingPiece = boardState[fromR][fromC];
             pendingMoveContext = { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } };
@@ -606,10 +606,9 @@
             document.getElementById('dangerDesc').innerText = `移动您的 [${movingPiece.type}] 到 (${toR}, ${toC}) 将直接暴露在对方火网中，有被吃子的风险！确定执意前进吗？`;
             document.getElementById('dangerBanner').classList.add('active');
             
-            // Map continuous confirmation callback triggers explicitly
             document.getElementById('dangerConfirmBtn').onclick = () => {
                 const ctx = pendingMoveContext;
-                cancelPendingMove(); // Dismiss modal layer safely
+                cancelPendingMove(); 
                 commitPieceMovement(ctx.from.r, ctx.from.c, ctx.to.r, ctx.to.c);
             };
         }
@@ -620,7 +619,6 @@
             clearSelectionHighlights();
         }
 
-        // Finalize transaction execution sequence safely across contexts
         function commitPieceMovement(fromR, fromC, toR, toC) {
             if (myRole !== null) {
                 sendMqttMessage('move', { from: { r: fromR, c: fromC }, to: { r: toR, c: toC } });
@@ -628,25 +626,20 @@
             executeMoveSync(fromR, fromC, toR, toC);
         }
 
-        // Simulate matrix transformations to identify incoming interception risks
         function isCapturedRiskMove(fromR, fromC, toR, toC, currentSide) {
             const tempSourcePiece = boardState[fromR][fromC];
             const tempTargetPiece = boardState[toR][toC];
             const opponentColor = currentSide === 'red' ? 'black' : 'red';
             let riskDetected = false;
 
-            // Execute local shadow matrix branch conversion
             boardState[toR][toC] = tempSourcePiece;
             boardState[fromR][fromC] = null;
 
-            // Probe opponent's structural vectors for valid interception fields
             for (let r = 0; r < 10; r++) {
                 for (let c = 0; c < 9; c++) {
                     const enemyPiece = boardState[r][c];
                     if (enemyPiece && enemyPiece.color === opponentColor) {
-                        // Pass true flag to structural validators to secure edge computation constraints
                         if (validateMove(r, c, toR, toC, true)) {
-                            // Verify that this specific move doesn't leave the opponent in an invalid blunder state itself
                             if (!isBlunderMove(r, c, toR, toC, opponentColor)) {
                                 riskDetected = true;
                                 break;
@@ -657,7 +650,6 @@
                 if (riskDetected) break;
             }
 
-            // Revert spatial matrix layer to maintain parity
             boardState[fromR][fromC] = tempSourcePiece;
             boardState[toR][toC] = tempTargetPiece;
 
