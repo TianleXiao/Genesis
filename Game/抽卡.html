@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星轨纪元 · 终极全息重构舱 Engine V4</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* Hardware Acceleration & Ultimate Visuals */
+        .will-transform { will-change: transform, opacity; }
+        
+        @keyframes subtle-pulse {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.02); filter: brightness(1.2); }
+        }
+        .animate-subtle { animation: subtle-pulse 3s ease-in-out infinite; }
+
+        /* Cinematic 3D Rotator Component */
+        .perspective-stage { perspective: 2000px; }
+        .card-core { 
+            transform-style: preserve-3d; 
+            transition: transform 0.8s cubic-bezier(0.075, 0.82, 0.165, 1); 
+        }
+        .card-flipped { transform: rotateY(180deg); }
+        .side-hidden { backface-visibility: hidden; position: absolute; inset: 0; }
+        .side-reverse { transform: rotateY(180deg); }
+
+        /* Luxury SSR Spectrum Ray Shader */
+        .ssr-foil {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #090910 0%, #15102a 50%, #2d0b3d 100%);
+        }
+        .ssr-foil::before {
+            content: '';
+            position: absolute;
+            inset: -50%;
+            background: linear-gradient(
+                115deg,
+                transparent 20%,
+                rgba(255, 215, 0, 0.15) 40%,
+                rgba(255, 255, 255, 0.4) 50%,
+                rgba(255, 105, 180, 0.15) 60%,
+                transparent 80%
+            );
+            transform: rotate(25deg) translate(-30%, -30%);
+            transition: transform 0.5s ease;
+            pointer-events: none;
+            mix-blend-mode: color-dodge;
+        }
+
+        /* Custom Ultra-thin Scrollbar */
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e1e38; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3b3b6d; }
+    </style>
+</head>
+<body class="bg-[#030308] text-slate-200 min-h-screen select-none overflow-x-hidden antialiased">
+
+    <div id="control-panel" class="container mx-auto px-6 py-8 transition-all duration-700 will-transform">
+        <header class="flex flex-col md:flex-row justify-between items-center border-b border-neutral-900 pb-6 mb-8 gap-4">
+            <div>
+                <span class="text-[9px] bg-emerald-950/40 text-emerald-400 border border-emerald-900/40 px-2 py-0.5 rounded font-mono tracking-widest uppercase">Quantum Grid Online // FPS: 60 FIXED</span>
+                <h1 class="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-pink-500 to-amber-400 mt-1">
+                    星轨起源 · 终极物质解构舱
+                </h1>
+            </div>
+            
+            <div class="flex items-center gap-6 bg-neutral-950/80 px-6 py-3 rounded-2xl border border-neutral-900 backdrop-blur-xl shadow-2xl">
+                <div class="text-center">
+                    <span class="text-[9px] text-neutral-500 uppercase tracking-wider block font-mono">星系晶核</span>
+                    <span id="display-diamonds" class="text-xl font-black text-cyan-400 font-mono">64000</span>
+                </div>
+                <div class="h-8 w-[1px] bg-neutral-900"></div>
+                <div class="text-center">
+                    <span class="text-[9px] text-neutral-500 uppercase tracking-wider block font-mono">高维宏观碎片</span>
+                    <span id="display-shards" class="text-xl font-black text-rose-400 font-mono">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-gradient-to-b from-neutral-950 to-[#070712] rounded-3xl p-6 border border-neutral-900 relative overflow-hidden shadow-2xl">
+                    <h2 class="text-md font-black tracking-wide text-neutral-200 uppercase mb-1">湮灭法则：终焉复苏</h2>
+                    <p class="text-neutral-500 text-xs mb-6">星使级生命体出现概率已完成超对称矩阵校准。</p>
+
+                    <div class="bg-black/60 rounded-2xl p-4 mb-6 border border-neutral-900">
+                        <div class="flex justify-between items-center mb-2 text-[10px] font-mono">
+                            <span class="text-neutral-400">保底重构视界脉冲:</span>
+                            <span id="pity-counter" class="text-amber-400 font-black bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">90 GENERATIONS</span>
+                        </div>
+                        <div class="w-full bg-neutral-950 rounded-full h-1 relative overflow-hidden">
+                            <div id="pity-fluid-bar" class="bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="igniteGachaMatrix(1)" class="w-full bg-neutral-950 hover:bg-neutral-900 text-neutral-300 font-bold py-3 px-4 rounded-xl border border-neutral-800 hover:border-neutral-700 transition duration-150 active:scale-95 text-xs tracking-widest font-mono">
+                            单发粒子淬炼<br><span class="text-[9px] text-neutral-500 font-normal">160 DIAMONDS</span>
+                        </button>
+                        <button onclick="igniteGachaMatrix(10)" class="w-full bg-gradient-to-r from-indigo-600 via-pink-600 to-amber-500 hover:brightness-110 text-white font-black py-3 px-4 rounded-xl transition duration-150 active:scale-95 text-xs tracking-widest font-mono shadow-xl shadow-pink-950/20">
+                            十连天象级解构<br><span class="text-[9px] text-indigo-100 font-normal">1600 DIAMONDS</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-neutral-950/40 rounded-3xl p-6 border border-neutral-900/60 shadow-xl">
+                    <h3 class="text-[10px] font-bold text-neutral-500 mb-3 tracking-widest uppercase font-mono">解构波谱实时序列</h3>
+                    <div id="console-stream" class="space-y-1.5 max-h-[220px] overflow-y-auto text-[11px] font-mono">
+                        <div class="text-neutral-600 italic">量子谐振腔处于静默状态...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 bg-neutral-950/60 rounded-3xl p-6 border border-neutral-900 shadow-2xl backdrop-blur-md">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <h2 class="text-md font-black tracking-wider uppercase flex items-center gap-2">
+                        <span>中央存储器资产质能谱</span>
+                        <span id="sync-ratio" class="text-[10px] font-mono bg-neutral-900 text-neutral-400 px-2.5 py-1 rounded-full border border-neutral-800">SYNC: 0%</span>
+                    </h2>
+                </div>
+
+                <div id="collection-vault" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[560px] overflow-y-auto p-1">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="cinema-stage" class="hidden fixed inset-0 z-50 bg-black overflow-hidden will-transform">
+        <canvas id="fluid-canvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+        <div id="white-out-flash" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-10 will-transform"></div>
+
+        <div id="cinema-arena" class="absolute inset-0 flex flex-col justify-between items-center p-6 opacity-0 transition-opacity duration-1000 z-20 hidden will-transform">
+            <div class="text-center mt-4">
+                <h2 id="cinema-headline" class="text-2xl font-black tracking-widest text-neutral-300 font-mono uppercase">Coherence Verification Matrix</h2>
+                <p class="text-neutral-500 text-[10px] uppercase font-mono tracking-widest mt-1">Interact with cards to perceive high-dimensional physical attributes</p>
+            </div>
+            
+            <div id="cinema-cards-dock" class="flex flex-wrap justify-center items-center gap-6 max-w-7xl overflow-y-auto max-h-[72vh] py-6 px-4 perspective-stage">
+                </div>
+
+            <div class="mb-4 flex gap-4 font-mono">
+                <button id="skip-pipeline-btn" onclick="terminateCinematicTunnel()" class="bg-neutral-950/80 hover:bg-neutral-900 border border-neutral-900 text-neutral-500 hover:text-neutral-300 text-[10px] tracking-widest py-3.5 px-8 rounded-xl transition backdrop-blur-md">
+                    // BYPASS CHRONO DRIFT
+                </button>
+                <button id="close-pipeline-btn" onclick="shutdownCinemaStage()" class="hidden bg-gradient-to-r from-indigo-600 via-pink-600 to-amber-500 text-white font-black text-[10px] tracking-widest py-3.5 px-12 rounded-xl transition shadow-xl">
+                    // COMMIT STRUCTURAL SYNC
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Core Engine Data Vector Setup
+        let account = { diamonds: 64000, shards: 0 };
+        let pityTrack = { ssr: 0, sr: 0 };
+        let vaultRegistry = {};
+        let poolExecutionBatch = [];
+        let engineLoopId = null;
+        let runningTimers = [];
+
+        const CORE_ASSET_DB = [
+            { id: "A001", name: "终焉使徒·阿尔法", type: "Character", rarity: "SSR", attr: "虚无", desc: "引力奇点维度的执行长官，主掌宏观坍缩进程。", imgColor: "from-amber-500 via-orange-600 to-rose-500", meta: { hp: 5400, atk: 920 } },
+            { id: "A002", name: "炽天圣骑士", type: "Character", rarity: "SSR", attr: "光子", desc: "高维恒星外壳提炼的高纯度固态防壁，免疫因果切割。", imgColor: "from-yellow-400 via-amber-500 to-pink-500", meta: { hp: 7100, atk: 610 } },
+            { id: "A003", name: "灭世裁决之剑", type: "Weapon", rarity: "SSR", attr: "物质", desc: "强相互作用力凝聚形成的超光速分子振荡切断体。", imgColor: "from-rose-600 via-fuchsia-600 to-indigo-700", meta: { power: 1550 } },
+            { id: "A004", name: "影刃潜行者", type: "Character", rarity: "SR", attr: "相位", desc: "可自主使身体分子进入纠缠态，免疫物理碰撞限制。", imgColor: "from-fuchsia-700 to-slate-900", meta: { hp: 3200, atk: 480 } },
+            { id: "A005", name: "离子脉冲狙击枪", type: "Weapon", rarity: "SR", attr: "高压", desc: "远距离释放超高密度正电子流的强效热核融解兵器。", imgColor: "from-blue-600 to-neutral-950", meta: { power: 780 } },
+            { id: "A006", name: "标准合金战刃", type: "Weapon", rarity: "R", attr: "物理", desc: "经过多重热处理的军工级碳化钨结晶轻量型格斗刀刃。", imgColor: "from-neutral-700 to-neutral-800", meta: { power: 220 } }
+        ];
+
+        // Canvas Setup Context variables
+        const canvas = document.getElementById("fluid-canvas");
+        const ctx = canvas.getContext("2d");
+        let activeHighestRarity = 'R';
+        let particlePool = [];
+        const MAX_PARTICLES = 450;
+        let animationPhase = 'IDLE'; // IDLE, ACCUMULATE, DRIFT, SUPERNOVA
+        let cameraShakeIntensity = 0;
+
+        window.onload = function() {
+            CORE_ASSET_DB.forEach(asset => { vaultRegistry[asset.id] = 0; });
+            resizeRenderViewport();
+            initializeParticleObjectPool();
+            updateControlRoomHUD();
+            renderVaultMatrixGrid();
+            window.addEventListener('resize', resizeRenderViewport);
+        };
+
+        function resizeRenderViewport() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Initialize Memory-friendly Zero-GC Particle Pool
+        function initializeParticleObjectPool() {
+            particlePool = [];
+            for (let i = 0; i < MAX_PARTICLES; i++) {
+                particlePool.push({
+                    active: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, radius: 0,
+                    length: 0, angle: 0, speed: 0, alpha: 0, decay: 0, color: ''
+                });
+            }
+        }
+
+        // Reallocate Particle Attributes instantly without spawning new objects
+        function spawnParticle(phase) {
+            let p = particlePool.find(item => !item.active);
+            if (!p) return;
+
+            p.active = true;
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            if (phase === 'ACCUMULATE') {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.max(canvas.width, canvas.height) * (0.5 + Math.random() * 0.2);
+                p.x = cx + Math.cos(angle) * radius;
+                p.y = cy + Math.sin(angle) * radius;
+                p.speed = Math.random() * 5 + 4;
+                p.angle = angle;
+                p.radius = Math.random() * 2 + 0.8;
+            } else if (phase === 'DRIFT') {
+                p.x = cx + (Math.random() - 0.5) * 80;
+                p.y = cy + (Math.random() - 0.5) * 80;
+                p.z = Math.random() * 1000 + 300;
+                p.length = Math.random() * 45 + 15;
+                p.radius = Math.random() * 1.5 + 0.5;
+            } else if (phase === 'SUPERNOVA') {
+                p.x = cx; p.y = cy;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 18 + 4;
+                p.vx = Math.cos(angle) * speed;
+                p.vy = Math.sin(angle) * speed;
+                p.radius = Math.random() * 3.5 + 1;
+                p.alpha = 1;
+                p.decay = Math.random() * 0.015 + 0.005;
+            }
+
+            // High brightness spectrum attribution mapping
+            if (activeHighestRarity === 'SSR') {
+                p.color = `hsl(${Math.random() * 16 + 44}, 100%, ${Math.random() * 20 + 60}%)`;
+            } else if (activeHighestRarity === 'SR') {
+                p.color = `hsl(${Math.random() * 30 + 270}, 100%, ${Math.random() * 20 + 65}%)`;
+            } else {
+                p.color = `hsl(${Math.random() * 20 + 195}, 100%, ${Math.random() * 15 + 60}%)`;
+            }
+        }
+
+        // --- MATH SEED GACHA COMPUTATION ---
+        function igniteGachaMatrix(pulls) {
+            const bill = pulls === 10 ? 1600 : 160;
+            if (account.diamonds < bill) {
+                alert("CRITICAL CORE DENIED: Star Diamonds depletion. Recharge necessary.");
+                return;
+            }
+            account.diamonds -= bill;
+            poolExecutionBatch = [];
+            purgeEngineTimers();
+            activeHighestRarity = 'R';
+
+            for (let i = 0; i < pulls; i++) {
+                pityTrack.ssr++; pityTrack.sr++;
+                let rarity = 'R';
+
+                if (pityTrack.ssr >= 90) rarity = 'SSR';
+                else if (pityTrack.sr >= 10) rarity = Math.random() < 0.12 ? 'SSR' : 'SR';
+                else {
+                    const sample = Math.random() * 100;
+                    if (sample <= 2.2) rarity = 'SSR';
+                    else if (sample <= 13.8) rarity = 'SR';
+                    else rarity = 'R';
+                }
+
+                if (rarity === 'SSR') {
+                    pityTrack.ssr = 0; pityTrack.sr = 0; activeHighestRarity = 'SSR';
+                } else if (rarity === 'SR' && activeHighestRarity !== 'SSR') {
+                    pityTrack.sr = 0; activeHighestRarity = 'SR';
+                }
+
+                const tierSublist = CORE_ASSET_DB.filter(c => c.rarity === rarity);
+                const targetedItem = tierSublist[Math.floor(Math.random() * tierSublist.length)];
+                
+                let isDuplicated = vaultRegistry[targetedItem.id] > 0;
+                let microshards = isDuplicated ? (rarity === 'SSR' ? 50 : (rarity === 'SR' ? 10 : 2)) : 0;
+
+                account.shards += microshards;
+                vaultRegistry[targetedItem.id]++;
+                poolExecutionBatch.push({ card: targetedItem, isDuplicate: isDuplicated, shardReward: microshards });
+                writeConsoleStream(targetedItem);
+            }
+
+            updateControlRoomHUD();
+            renderVaultMatrixGrid();
+            triggerCinematicChoreography();
+        }
+
+        // --- ENGINE PIPELINE FRAME UPDATER (60FPS FIXED) ---
+        function updateEngineFrame() {
+            // Apply exponential kinetic screen shock dampening 
+            if (cameraShakeIntensity > 0.1) {
+                const sx = (Math.random() - 0.5) * cameraShakeIntensity;
+                const sy = (Math.random() - 0.5) * cameraShakeIntensity;
+                document.getElementById("cinema-stage").style.transform = `translate3d(${sx}px, ${sy}px, 0)`;
+                cameraShakeIntensity *= 0.88; // Physics friction factor
+            } else {
+                document.getElementById("cinema-stage").style.transform = 'none';
+            }
+
+            // Setup lighter alpha layering blends for premium light saturation look
+            ctx.fillStyle = animationPhase === 'DRIFT' ? 'rgba(3, 3, 8, 0.18)' : 'rgba(3, 3, 8, 0.35)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'lighter';
+
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            particlePool.forEach(p => {
+                if (!p.active) return;
+
+                if (animationPhase === 'ACCUMULATE') {
+                    const dx = cx - p.x;
+                    const dy = cy - p.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < 15) { p.active = false; return; }
+                    p.angle -= 0.025;
+                    const acceleration = p.speed * (1 + (260 / d));
+                    p.x += Math.cos(p.angle) * -acceleration + (dx / d) * 1.5;
+                    p.y += Math.sin(p.angle) * -acceleration + (dy / d) * 1.5;
+
+                    ctx.beginPath();
+                    ctx.fillStyle = p.color;
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } 
+                else if (animationPhase === 'DRIFT') {
+                    p.z -= 22;
+                    if (p.z <= 0) { p.active = false; return; }
+                    const px = ((p.x - cx) / p.z) * 600 + cx;
+                    const py = ((p.y - cy) / p.z) * 600 + cy;
+
+                    if (px >= 0 && px <= canvas.width && py >= 0 && py <= canvas.height) {
+                        const tx = ((p.x - cx) / (p.z + p.length)) * 600 + cx;
+                        const ty = ((p.y - cy) / (p.z + p.length)) * 600 + cy;
+                        ctx.beginPath();
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = p.radius * (600 / p.z);
+                        ctx.moveTo(px, py); ctx.lineTo(tx, ty);
+                        ctx.stroke();
+                    }
+                } 
+                else if (animationPhase === 'SUPERNOVA') {
+                    p.x += p.vx; p.y += p.vy;
+                    p.vx *= 0.96; p.vy *= 0.96;
+                    p.alpha -= p.decay;
+                    if (p.alpha <= 0) { p.active = false; return; }
+
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.beginPath();
+                    ctx.fillStyle = p.color;
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+
+            ctx.globalCompositeOperation = 'source-over';
+
+            // Maintain particle densities programmatically depending on phases
+            if (animationPhase !== 'IDLE') {
+                let spawnCount = animationPhase === 'DRIFT' ? 12 : 6;
+                for (let k = 0; k < spawnCount; k++) spawnParticle(animationPhase);
+                engineLoopId = requestAnimationFrame(updateEngineFrame);
+            }
+        }
+
+        // --- CHOREOGRAPHY STAGE CONTROLLER ---
+        function triggerCinematicChoreography() {
+            document.getElementById("control-panel").classList.add("scale-95", "blur-2xl");
+            const stage = document.getElementById("cinema-stage");
+            stage.classList.remove("hidden");
+            document.getElementById("cinema-arena").classList.add("hidden");
+            document.getElementById("cinema-arena").style.opacity = "0";
+
+            initializeParticleObjectPool();
+            animationPhase = 'ACCUMULATE';
+            updateEngineFrame();
+
+            // Sequence timeline step 1: Chrono Warp Velocity
+            allocateTimer(() => {
+                animationPhase = 'DRIFT';
+            }, 1300);
+
+            // Sequence timeline step 2: Dimension Shatter Supernova
+            allocateTimer(() => {
+                const flash = document.getElementById("white-out-flash");
+                flash.style.opacity = "1";
+                flash.style.transition = "none";
+                cameraShakeIntensity = 35; // Initial kinetic shake pixel radius
+
+                animationPhase = 'SUPERNOVA';
+                
+                // Smooth fade back out from pure white flash membrane
+                setTimeout(() => {
+                    flash.style.transition = "opacity 0.7s cubic-bezier(0.1, 0.8, 0.2, 1)";
+                    flash.style.opacity = "0";
+                }, 40);
+            }, 2700);
+
+            // Sequence timeline step 3: Reveal Structural Cards Dock
+            allocateTimer(() => {
+                animationPhase = 'IDLE';
+                if (engineLoopId) cancelAnimationFrame(engineLoopId);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                compileInteractiveDisplayDock();
+            }, 3200);
+        }
+
+        // --- PARALLAX MOUSE SHADER INTERACTION CORE ---
+        function setup3DParallaxCardEffect(element) {
+            const core = element.querySelector('.card-core');
+            
+            element.addEventListener('mousemove', (e) => {
+                if (!core.classList.contains('card-flipped')) return;
+                const rect = element.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Convert coordinates into normalized rotational values
+                const rotateX = ((y / rect.height) - 0.5) * -24; 
+                const rotateY = ((x / rect.width) - 0.5) * 24;
+
+                core.style.transform = `rotateY(180deg) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.04)`;
+                
+                // Shift dynamic gradient light angle
+                const sheen = core.querySelector('.ssr-foil');
+                if (sheen) {
+                    const px = (x / rect.width) * 100;
+                    const py = (y / rect.height) * 100;
+                    sheen.style.setProperty('--mx', `${px}%`);
+                    sheen.style.setProperty('--my', `${py}%`);
+                }
+            });
+
+            element.addEventListener('mouseleave', () => {
+                if (!core.classList.contains('card-flipped')) return;
+                core.style.transform = 'rotateY(180deg) scale(1)';
+            });
+        }
+
+        // Render Cards inside the Cinema Overlay 
+        function compileInteractiveDisplayDock() {
+            const arena = document.getElementById("cinema-arena");
+            const dock = document.getElementById("cinema-cards-dock");
+            arena.classList.remove("hidden");
+            setTimeout(() => arena.style.opacity = "1", 50);
+            dock.innerHTML = "";
+            document.getElementById("skip-pipeline-btn").classList.remove("hidden");
+            document.getElementById("close-pipeline-btn").classList.add("hidden");
+
+            document.getElementById("cinema-headline").className = "text-2xl font-black tracking-widest text-neutral-400 font-mono uppercase";
+            document.getElementById("cinema-headline").innerText = "量子相干性重构已就绪";
+
+            poolExecutionBatch.forEach((item, idx) => {
+                const cardWrapper = document.createElement("div");
+                cardWrapper.className = "w-48 h-72 cursor-pointer opacity-0 scale-75 transition-all duration-500 will-transform";
+                cardWrapper.style.transitionDelay = `${idx * 100}ms`;
+
+                let glowCls = { 'SSR': 'shadow-[0_0_40px_rgba(245,158,11,0.45)] border-amber-400 ssr-foil', 'SR': 'shadow-[0_0_25px_rgba(236,72,153,0.35)] border-pink-500', 'R': 'shadow-[0_0_15px_rgba(6,182,212,0.15)] border-neutral-900' }[item.card.rarity];
+                let textCls = { 'SSR': 'text-amber-400 font-black tracking-widest', 'SR': 'text-pink-400 font-bold', 'R': 'text-cyan-400' }[item.card.rarity];
+                
+                cardWrapper.innerHTML = `
+                    <div class="card-core w-full h-full relative will-transform">
+                        <div class="side-hidden bg-gradient-to-b from-neutral-950 to-[#04040a] rounded-2xl p-4 flex flex-col justify-between items-center border border-neutral-900 shadow-2xl">
+                            <span class="text-[8px] text-neutral-600 font-mono tracking-widest">DECRYPTION POD // #${idx+1}</span>
+                            <div class="w-14 h-14 rounded-full bg-black border border-neutral-900 flex items-center justify-center relative">
+                                <div class="absolute inset-0 rounded-full bg-pink-500/5 animate-ping"></div>
+                                <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500 font-black text-xl font-mono">?</span>
+                            </div>
+                            <span class="text-[8px] text-pink-500/80 font-mono tracking-widest animate-pulse">▲ CONFIRM ENTROPY</span>
+                        </div>
+                        <div class="side-hidden side-reverse bg-neutral-950 border-2 ${glowCls} rounded-2xl p-4 flex flex-col justify-between overflow-hidden">
+                            <div>
+                                <div class="flex justify-between items-center mb-2 font-mono">
+                                    <span class="text-xs ${textCls}">${item.card.rarity}</span>
+                                    <span class="text-[9px] bg-black/60 text-neutral-500 px-1.5 py-0.5 rounded border border-neutral-900/60">${item.card.type}</span>
+                                </div>
+                                <div class="h-28 w-full bg-gradient-to-br ${item.card.imgColor} rounded-xl flex items-center justify-center mb-3 relative shadow-inner">
+                                    <span class="text-[9px] font-mono font-black text-white bg-black/40 px-3 py-1 rounded-full backdrop-blur-md tracking-wider">${item.card.type.toUpperCase()}</span>
+                                </div>
+                                <div class="font-black text-xs text-neutral-200 tracking-tight truncate">${item.card.name}</div>
+                                <p class="text-[10px] text-neutral-500 leading-normal mt-1 line-clamp-2 font-light">${item.card.desc}</p>
+                            </div>
+                            <div class="space-y-2">
+                                ${item.isDuplicate ? `<div class="text-[8px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 text-center rounded py-0.5">DUPLICATE -> +${item.shardReward} SHARDS</div>` : ''}
+                                <div class="text-[9px] text-neutral-600 font-mono flex justify-between items-center pt-2 border-t border-neutral-900">
+                                    <span>CORE: ${item.card.attr}</span>
+                                    <span class="text-neutral-400">⚙</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                cardWrapper.onclick = () => {
+                    const core = cardWrapper.querySelector('.card-core');
+                    core.classList.toggle('card-flipped');
+                };
+
+                dock.appendChild(cardWrapper);
+                setup3DParallaxCardEffect(cardWrapper);
+
+                setTimeout(() => {
+                    cardWrapper.classList.remove("opacity-0", "scale-75");
+                    cardWrapper.classList.add("opacity-100", "scale-100");
+                }, 50);
+
+                // Automatic incremental sequential flip sequencing
+                const tId = setTimeout(() => {
+                    const core = cardWrapper.querySelector('.card-core');
+                    if (core) core.classList.add('card-flipped');
+                    if (idx === poolExecutionBatch.length - 1) signalPipelineResolution();
+                }, (idx * 120) + 1000);
+                runningTimers.push(tId);
+            });
+        }
+
+        function terminateCinematicTunnel() {
+            purgeEngineTimers();
+            if (engineLoopId) cancelAnimationFrame(engineLoopId);
+            if (document.getElementById("cinema-arena").classList.contains("hidden")) {
+                compileInteractiveDisplayDock();
+            }
+            poolExecutionBatch.forEach((_, idx) => {
+                const wrappers = document.getElementById("cinema-cards-dock").children;
+                if (wrappers[idx]) {
+                    wrappers[idx].className = "w-48 h-72 cursor-pointer opacity-100 scale-100";
+                    wrappers[idx].querySelector('.card-core').classList.add('card-flipped');
+                }
+            });
+            signalPipelineResolution();
+        }
+
+        function signalPipelineResolution() {
+            const h = document.getElementById("cinema-headline");
+            h.className = "text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-pink-400 to-amber-400 font-mono uppercase";
+            h.innerText = "高维物理构型解析完毕";
+            document.getElementById("skip-pipeline-btn").classList.add("hidden");
+            document.getElementById("close-pipeline-btn").classList.remove("hidden");
+        }
+
+        function shutdownCinemaStage() {
+            document.getElementById("cinema-stage").classList.add("hidden");
+            document.getElementById("control-panel").classList.remove("scale-95", "blur-2xl");
+            purgeEngineTimers();
+        }
+
+        function allocateTimer(fn, ms) {
+            const id = setTimeout(fn, ms);
+            runningTimers.push(id);
+        }
+
+        function purgeEngineTimers() {
+            runningTimers.forEach(id => clearTimeout(id));
+            runningTimers = [];
+        }
+
+        // --- DASHBOARD AND INTERFACE RENDER CORES ---
+        function updateControlRoomHUD() {
+            document.getElementById("display-diamonds").innerText = account.diamonds;
+            document.getElementById("display-shards").innerText = account.shards;
+            const rem = 90 - pityTrack.ssr;
+            document.getElementById("pity-counter").innerText = `${rem} UNCONSTRAINED`;
+            document.getElementById("pity-fluid-bar").style.width = `${(pityTrack.ssr / 90) * 100}%`;
+        }
+
+        function writeConsoleStream(card) {
+            const box = document.getElementById("console-stream");
+            if (box.innerHTML.includes("量子谐振")) box.innerHTML = "";
+            const time = new Date().toLocaleTimeString();
+            let tierColor = { 'SSR': 'text-amber-400 font-black', 'SR': 'text-pink-400 font-bold', 'R': 'text-cyan-500' }[card.rarity];
+            
+            const line = document.createElement("div");
+            line.className = `border-b border-neutral-950 pb-1 ${tierColor}`;
+            line.innerHTML = `[${time}] LOG // QUANTUM EXTRACT -> ${card.rarity} // [${card.type}] - ${card.name}`;
+            box.insertBefore(line, box.firstChild);
+        }
+
+        function renderVaultMatrixGrid() {
+            const vault = document.getElementById("collection-vault");
+            vault.innerHTML = "";
+            let collectedCount = 0;
+
+            CORE_ASSET_DB.forEach(asset => {
+                const count = vaultRegistry[asset.id] || 0;
+                if (count > 0) collectedCount++;
+                const isLocked = count === 0;
+
+                const node = document.createElement("div");
+                node.className = `bg-black border ${isLocked ? 'border-neutral-950 opacity-20' : 'border-neutral-900'} rounded-2xl p-3.5 flex flex-col justify-between transition duration-150`;
+                let badge = { 'SSR': 'bg-amber-500/10 text-amber-400 border-amber-500/20', 'SR': 'bg-pink-500/10 text-pink-400 border-pink-500/20', 'R': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' }[asset.rarity];
+
+                node.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-2 font-mono text-[9px]">
+                            <span class="px-1.5 py-0.5 rounded border ${badge}">${asset.rarity}</span>
+                            <span class="text-neutral-600">${asset.type}</span>
+                        </div>
+                        <div class="font-black text-xs text-neutral-300 truncate">${asset.name}</div>
+                    </div>
+                    <div class="mt-4 pt-1.5 border-t border-neutral-900 flex justify-between items-center text-[10px] text-neutral-600 font-mono">
+                        <span>ATTR: ${asset.attr}</span>
+                        <span class="text-neutral-400 bg-neutral-900 px-1.5 py-0.5 rounded">x${count}</span>
+                    </div>
+                `;
+                vault.appendChild(node);
+            });
+            document.getElementById("sync-ratio").innerText = `SYNC: ${Math.round((collectedCount/CORE_ASSET_DB.length)*100)}%`;
+        }
+    </script>
+</body>
+</html>
